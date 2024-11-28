@@ -152,3 +152,109 @@ The same logic applies as with cURL, but keep the content within the curly brack
     "QUANTITY": 0.01
 }
 ```
+
+## Running the App as a Service
+
+You can run the app as a service using two methods:
+
+1. **Supervisor** (`supervisorctl`)
+2. **systemd** (`systemctl`)
+
+Choose the one that best fits your needs.
+
+---
+
+### Option 1: Using Supervisor
+
+#### Steps:
+Install `supervisor` on your system:
+```bash
+sudo apt update
+sudo apt install supervisor
+```
+Create a configuration file for the app:
+```bash
+sudo nano /etc/supervisor/conf.d/tradex.conf
+```
+Add the following content:
+```bash
+[program:tradex]
+command=python3 /path/to/app.py
+directory=/path/to/
+autostart=true
+autorestart=true
+stderr_logfile=/var/log/tradex.err.log
+stdout_logfile=/var/log/tradex.out.log
+user=your-username
+```
+...and eplace /path/to/ with the directory where your app is located, and your-username with your system's username.
+ Apply the Configuration, reload Supervisor and start the service:
+ ```bash
+sudo supervisorctl reread
+sudo supervisorctl update
+sudo supervisorctl start tradexlog/tradex.out.log
+```
+Check the status of your app:
+ ```bash
+sudo supervisorctl status
+```
+To stop or restart the app:
+ ```bash
+sudo supervisorctl stop tradex
+sudo supervisorctl restart tradex
+```
+Standard Output: /var/log/tradex.out.log
+Errors: /var/log/tradex.err.log
+
+### Option 2: Using systemd
+
+#### Steps:
+Create a .service file for your app:
+ ```bash
+sudo nano /etc/systemd/system/tradex.service
+```
+Add the following content:
+ ```bash
+[Unit]
+Description=TradeX Service
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /path/to/app.py
+WorkingDirectory=/path/to/
+Restart=always
+User=your-username
+Group=your-group
+StandardOutput=append:/var/log/tradex.log
+StandardError=append:/var/log/tradex.err.log
+
+[Install]
+WantedBy=multi-user.target
+```
+Replace /path/to/ with the directory where your app is located, and your-username and your-group with the appropriate system user and group.
+
+Reload systemd to recognize the new service:
+ ```bash
+sudo systemctl daemon-reload
+```
+Enable the service to start on boot:
+ ```bash
+sudo systemctl enable tradex.service
+```
+Start the service:
+ ```bash
+sudo systemctl start tradex.service
+```
+Check the service status:
+ ```bash
+sudo systemctl status tradex.service
+```
+View logs using journalctl:
+ ```bash
+journalctl -u tradex.service -f
+```
+To stop or restart the service:
+ ```bash
+sudo systemctl stop tradex.service
+sudo systemctl restart tradex.service
+```
