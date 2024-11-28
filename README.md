@@ -10,7 +10,7 @@
 - **Order Management**: Place, modify, and cancel orders directly from the dashboard.
 - **Pending and Open Positions**: View all your active and pending orders in a user-friendly interface.
 - **Close All Positions**: Quickly close all open positions with a single click.
-- **Authentication**: Secure the dashboard with a username and password.
+- to be **Authentication**: Secure the dashboard with a username and password.
 - **Trade PIN Protection**: Add an extra layer of security by requiring a PIN for order execution via webhooks.
 
 ---
@@ -27,7 +27,7 @@
 
 1. Clone the repository:
     ```bash
-    git clone https://github.com/your-username/tradex.git
+    git clone https://github.com/Sentello/tradex.git
     cd tradex
     ```
 
