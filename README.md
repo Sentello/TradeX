@@ -10,7 +10,7 @@
 - **Order Management**: Place, modify, and cancel orders directly from the dashboard.
 - **Pending and Open Positions**: View all your active and pending orders in a user-friendly interface.
 - **Close All Positions**: Quickly close all open positions with a single click.
-- to be **Authentication**: Secure the dashboard with a username and password.
+- **Authentication**: Secure the dashboard with a username and password.
 - **Trade PIN Protection**: Add an extra layer of security by requiring a PIN for order execution via webhooks.
 
 ---
