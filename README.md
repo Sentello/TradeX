@@ -19,7 +19,12 @@
 
 ![App_Screenshot](https://github.com/user-attachments/assets/79bd5123-c81c-49b1-9e8e-5d064698f20d)
 
+---
 
+## Supported Exchanges
+- Bybit Futures
+- Binance Futures (not fully tested)
+- Additional changes can be made upon request, or you can contribute by submitting a pull request
 ---
 
 ## Installation
