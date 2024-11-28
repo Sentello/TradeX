@@ -99,6 +99,19 @@ curl -X POST http://192.168.1.8:5000/webhook -H "Content-Type: application/json"
 }'
 ```
 
+Place a Market Sell Order
+
+```bash
+curl -X POST http://192.168.1.8:5000/webhook -H "Content-Type: application/json" -d '{
+    "PIN": "123456",
+    "EXCHANGE": "bybit",
+    "SYMBOL": "BTCUSDT",
+    "SIDE": "sell",
+    "ORDER_TYPE": "market",
+    "QUANTITY": 0.001
+}'
+```
+
 Place a Limit Order with Stop Loss and Take Profit
 
 ```bash
