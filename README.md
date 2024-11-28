@@ -1,5 +1,5 @@
 # TradeX
-![image](https://github.com/user-attachments/assets/869386f3-7cc4-4768-a619-7344bd16d4fc| width=100))
+![image](https://github.com/user-attachments/assets/869386f3-7cc4-4768-a619-7344bd16d4fc| width=100)
 
 **TradeX** is a web-based trading bot dashboard designed to enhance your cryptocurrency trading experience by managing and monitoring positions across multiple exchanges. Key features include authentication measures and configurable PIN protection for trade execution, ensuring secure transactions. The platform allows users to execute trades on various crypto exchanges, streamlining the trading process. TradeX can accept webhooks from TradingView, enabling automated trade placements based on market signals. With its robust capabilities, TradeX aims to simplify the complexities of cryptocurrency trading, making it accessible for both novice and experienced traders.
 
