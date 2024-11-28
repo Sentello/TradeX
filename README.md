@@ -15,6 +15,13 @@
 
 ---
 
+## Screenshots
+
+![App_Screenshot](https://github.com/user-attachments/assets/79bd5123-c81c-49b1-9e8e-5d064698f20d)
+
+
+---
+
 ## Installation
 
 ### Prerequisites
@@ -128,8 +135,5 @@ curl -X POST http://<server-ip>:5000/webhook -H "Content-Type: application/json"
 }'
 ```
 
-## Screenshots
-
-![App_Screenshot](https://github.com/user-attachments/assets/79bd5123-c81c-49b1-9e8e-5d064698f20d)
 
 
