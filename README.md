@@ -59,13 +59,44 @@
 ## Usage
 
 ### Webhook Example
-To place an order via the webhook, use the following example:
+To place an order via the webhook, use the following examples:
+
 ```bash
 curl -X POST http://<server-ip>:5000/webhook -H "Content-Type: application/json" -d '{
     "PIN": "123456",
     "EXCHANGE": "bybit",
     "SYMBOL": "BTCUSDT",
-    "SIDE": "sell",
+    "SIDE": "buy",
     "ORDER_TYPE": "market",
-    "QUANTITY": 0.001
+    "QUANTITY": 0.01
 }'
+```
+Place a Limit Order
+
+```bash
+curl -X POST http://<server-ip>:5000/webhook -H "Content-Type: application/json" -d '{
+    "PIN": "123456",
+    "EXCHANGE": "binance",
+    "SYMBOL": "ETHUSDT",
+    "SIDE": "sell",
+    "ORDER_TYPE": "limit",
+    "QUANTITY": 0.5,
+    "PRICE": 2000.50
+}'
+```
+
+Place a Limit Order with Stop Loss and Take Profit
+
+```bash
+curl -X POST http://<server-ip>:5000/webhook -H "Content-Type: application/json" -d '{
+    "PIN": "123456",
+    "EXCHANGE": "bybit",
+    "SYMBOL": "BTCUSDT",
+    "SIDE": "buy",
+    "ORDER_TYPE": "limit",
+    "QUANTITY": 0.01,
+    "PRICE": 30000,
+    "STOP_LOSS": 29000,
+    "TAKE_PROFIT": 31000
+}'
+```
