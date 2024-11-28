@@ -43,7 +43,7 @@
     ```
 
 4. Configure your environment variables:
-    - Copy the `config.example.py` file to `config.py`.
+    - Edit the config file `config.py`.
     - Add your exchange API keys, dashboard password, and PIN in `config.py`.
 
 5. Run the application:
