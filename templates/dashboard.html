@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading Bot Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+        }
+
+        h1 {
+            text-align: center;
+            color: #4CAF50;
+            margin: 20px 0;
+        }
+
+        h2 {
+            text-align: center;
+            color: #555;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 20px auto;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: center;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        tr:hover {
+            background-color: #f1f1f1;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            transition: 0.3s;
+        }
+
+        .close-btn {
+            background-color: #ff5252;
+            color: white;
+        }
+
+        .close-btn:hover {
+            background-color: #ff1744;
+        }
+
+        .close-all-btn {
+            background-color: #ff9800;
+            color: white;
+            margin: 20px;
+            display: block;
+            width: fit-content;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .close-all-btn:hover {
+            background-color: #ff7043;
+        }
+
+        footer {
+            text-align: center;
+            padding: 10px;
+            margin-top: 20px;
+            background-color: #4CAF50;
+            color: white;
+        }
+    </style>
+    <script>
+        // JavaScript for auto-updating the Open Positions table
+        async function fetchPositions() {
+            try {
+                const response = await fetch('/positions');
+                const positionsData = await response.json();
+
+                const positionsBody = document.querySelector('#positions-body');
+                positionsBody.innerHTML = ''; // Clear the table
+
+                for (const exchange in positionsData) {
+                    const positions = positionsData[exchange];
+
+                    positions.forEach(position => {
+                        const row = `
+                            <tr>
+                                <td>${position.symbol}</td>
+                                <td>${position.contracts}</td>
+                                <td>${position.value.toFixed(2)}</td>
+                                <td>${position.entry_price}</td>
+                                <td>${position.liquidation_price || 'N/A'}</td>
+                                <td>${position.position_margin.toFixed(2)}</td>
+                                <td>${position.unrealized_pnl.toFixed(2)}</td>
+                                <td>${position.exchange}</td>
+                                <td>
+                                    <form method="POST" action="/close_position" onsubmit="return confirm('Close position for ${position.symbol}?')">
+                                        <input type="hidden" name="EXCHANGE" value="${position.exchange}">
+                                        <input type="hidden" name="SYMBOL" value="${position.symbol}">
+                                        <button type="submit" class="close-btn">Close</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        `;
+                        positionsBody.innerHTML += row;
+                    });
+                }
+            } catch (error) {
+                console.error('Error fetching positions:', error);
+            }
+        }
+
+        // JavaScript for auto-updating the Pending Orders table
+        async function fetchPendingOrders() {
+            try {
+                const response = await fetch('/pending_orders');
+                const pendingOrdersData = await response.json();
+
+                const pendingOrdersBody = document.querySelector('#pending-orders-body');
+                pendingOrdersBody.innerHTML = ''; // Clear the table
+
+                for (const exchange in pendingOrdersData) {
+                    const orders = pendingOrdersData[exchange];
+
+                    orders.forEach(order => {
+                        const row = `
+                            <tr>
+                                <td>${order.symbol}</td>
+                                <td>${order.type}</td>
+                                <td>${order.side}</td>
+                                <td>${order.price}</td>
+                                <td>${order.quantity}</td>
+                                <td>${exchange}</td>
+                                <td>
+                                    <form action="/cancel_order" method="POST">
+                                        <input type="hidden" name="EXCHANGE" value="${exchange}">
+                                        <input type="hidden" name="ORDER_ID" value="${order.id}">
+                                        <input type="hidden" name="SYMBOL" value="${order.symbol}">
+                                        <button type="submit" class="close-btn">Cancel</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        `;
+                        pendingOrdersBody.innerHTML += row;
+                    });
+                }
+            } catch (error) {
+                console.error('Error fetching pending orders:', error);
+            }
+        }
+
+        // Auto-fetch positions and pending orders every 5 seconds
+        setInterval(() => {
+            fetchPositions();
+            fetchPendingOrders();
+        }, 5000);
+
+        // Fetch positions and pending orders when the page loads
+        window.onload = () => {
+            fetchPositions();
+            fetchPendingOrders();
+        };
+    </script>
+</head>
+<body>
+    <h1>💰 Trading Bot Dashboard</h1> 
+    <!-- Error message display -->
+    {% if error %}
+    <div style="color: red; text-align: center; margin: 20px;">
+        <strong>Error:</strong> {{ error }}
+    </div>
+    {% endif %}
+
+    <div class="container">
+    <h2>Open Positions</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Contract</th>
+                    <th>Size</th>
+                    <th>Value</th>
+                    <th>Entry Price</th>
+                    <th>Liquidation Price</th>
+                    <th>Position Margin</th>
+                    <th>Unrealized PNL</th>
+                    <th>Exchange</th>
+                    <th>Close</th>
+                </tr>
+            </thead>
+            <tbody id="positions-body">
+                <!-- Positions will be populated here -->
+            </tbody>
+        </table>
+    </div>
+
+    <div class="container">
+        <!-- Pending Orders Section -->
+        <h2>Pending Orders</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Symbol</th>
+                    <th>Type</th>
+                    <th>Side</th>
+                    <th>Price</th>
+                    <th>Quantity</th>
+                    <th>Exchange</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="pending-orders-body">
+                <!-- Pending orders will be populated here -->
+            </tbody>
+        </table>
+    </div>
+
+    <form method="POST" action="/close_all_positions" onsubmit="return confirm('Close allopen  positions?')">
+        <button type="submit" class="close-all-btn">Close All Open  Positions</button>
+    </form>
+
+    <footer>
+        &copy; Trading Bot Dashboard
+    </footer>
+</body>
+</html>
