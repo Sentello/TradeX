@@ -1,11 +1,6 @@
 # TradeX
 
-**TradeX** is a web-based trading bot dashboard designed to enhance your cryptocurrency trading experience by managing and monitoring positions across multiple exchanges. It provides a lightweight interface that supports automation, order management, and secure operations. Key features include:
-Authentication and Security: TradeX incorporates authentication measures and configurable PIN protection for trade execution, ensuring secure transactions.
-Multi-Exchange Support: The platform allows users to execute trades on various crypto exchanges, streamlining the trading process.
-Webhook Integration: TradeX can accept webhooks from TradingView, enabling automated trade placements based on market signals.
-Position Monitoring: Users can efficiently monitor their trading positions and manage pending orders through the intuitive dashboard.
-With its robust capabilities, TradeX aims to simplify the complexities of cryptocurrency trading, making it accessible for both novice and experienced traders.
+**TradeX** is a web-based trading bot dashboard designed to enhance your cryptocurrency trading experience by managing and monitoring positions across multiple exchanges. It provides a lightweight interface that supports automation, order management, and secure operations. Key features include authentication measures and configurable PIN protection for trade execution, ensuring secure transactions. The platform allows users to execute trades on various crypto exchanges, streamlining the trading process. Additionally, TradeX can accept webhooks from TradingView, enabling automated trade placements based on market signals. With its robust capabilities, TradeX aims to simplify the complexities of cryptocurrency trading, making it accessible for both novice and experienced traders.
 
 ---
 
