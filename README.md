@@ -141,7 +141,7 @@ curl -X POST http://<server-ip>:5000/webhook -H "Content-Type: application/json"
 ```
 
 ### Webhook Example (TradingView Webhook)
-The same logic applies as with cURL, but keep the content within the curly brackets as it is, so it looks like this.
+The same logic applies as with cURL, but keep the content within the curly brackets as it is, so it looks like this:
 ```bash
 {
     "PIN": "123456",
