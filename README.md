@@ -70,7 +70,7 @@
 
 ## Usage
 
-### Webhook Example
+### Webhook Example (testing from curl)
 To place an order via the webhook, use the following examples:
 
 ```bash
@@ -140,5 +140,15 @@ curl -X POST http://<server-ip>:5000/webhook -H "Content-Type: application/json"
 }'
 ```
 
-
-
+### Webhook Example (TradingView Webhook)
+The same logic applies as with cURL, but keep the content within the curly brackets as it is, so it looks like this.
+```bash
+{
+    "PIN": "123456",
+    "EXCHANGE": "bybit",
+    "SYMBOL": "BTCUSDT",
+    "SIDE": "buy",
+    "ORDER_TYPE": "market",
+    "QUANTITY": 0.01
+}
+```
