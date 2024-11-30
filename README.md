@@ -3,6 +3,16 @@
 **TradeX** is a web-based trading bot dashboard designed to enhance your cryptocurrency trading experience by managing and monitoring positions across multiple exchanges. Key features include authentication measures and configurable PIN protection for trade execution, ensuring secure transactions. The platform allows users to execute trades on various crypto exchanges, streamlining the trading process. TradeX can accept webhooks from TradingView, enabling automated trade placements based on market signals. With its robust capabilities, TradeX aims to simplify the complexities of cryptocurrency trading, making it accessible for both novice and experienced traders.
 
 ---
+## Table of Contents
+- [Features](#features)
+- [Screenshots](#screenshots)
+- [Supported Exchanges](#supported-exchanges)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Running TradeX as a Service](#running-tradex-as-a-service)
+- [Running TradeX in Docker](#running-tradex-in-docker)
+
+---
 
 ## Features
 
@@ -154,7 +164,7 @@ The same logic applies as with cURL, but keep the content within the curly brack
 ```
 Please note that TradingView can only use webhooks on ports 80 or 443. This means you'll need to proxy your webhook port to either 80 or 443, depending on your requirements. I strongly recommend using port 80 to avoid potential SSL-related complications and suggest using Nginx as a proxy for this setup.
 
-## Running the TradeX as a Service
+## Running TradeX as a Service
 
 You can run the app as a service using two methods:
 
@@ -303,7 +313,7 @@ systemctl stop dashboard_app
 systemctl stop webhook_app
 ```
 
-## Running the TradeX as a Docker
+## Running TradeX as a Docker
 Before you begin, ensure you have the following installed on your system:
 - [Git](https://git-scm.com/)
 - [Docker](https://www.docker.com/)
