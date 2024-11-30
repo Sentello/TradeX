@@ -313,7 +313,7 @@ systemctl stop dashboard_app
 systemctl stop webhook_app
 ```
 
-## Running TradeX as a Docker
+## Running TradeX in Docker
 Before you begin, ensure you have the following installed on your system:
 - [Git](https://git-scm.com/)
 - [Docker](https://www.docker.com/)
