@@ -363,11 +363,11 @@ If you decide not to change the webhook port from `5005` to port `80` or `443`, 
    sudo apt install nginx
    ```
 2. **Create a New Nginx Configuration**:
-  ```bash
+   ```bash
    sudo nano /etc/nginx/sites-available/tradex-webhook
    ```
-Add the following content:
-  ```bash
+    Add the following content:
+ ```bash
 server {
     listen 80;
     server_name your.domain.com; # Replace with your domain or server IP
@@ -383,10 +383,10 @@ server {
 }
    ```
 3. **Enable the New Configuration**:
-```bash
-sudo ln -s /etc/nginx/sites-available/tradex-webhook /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl restart nginx
+  ```bash
+   sudo ln -s /etc/nginx/sites-available/tradex-webhook /etc/nginx/sites-enabled/
+   sudo nginx -t
+   sudo systemctl restart nginx
    ```
 4. **Update Your Webhook URL**:
-When sending webhooks (from TradingView), use the new URL pointing to your domain or server IP on port 80: `http://your.domain.com/webhook`
+   When sending webhooks (from TradingView), use the new URL pointing to your domain or server IP on port 80: `http://your.domain.com/webhook`
