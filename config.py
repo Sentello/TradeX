@@ -2,7 +2,7 @@
 # Leave blank if not using
 
 # Replace with your secure PIN
-WEBHOOK_PIN = "123456" 
+WEBHOOK_PIN = "123456"
 
 # Replace with your strong password
 DASHBOARD_PASSWORD = "securepassword123"
