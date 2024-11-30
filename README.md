@@ -172,27 +172,40 @@ Install `supervisor` on your system:
 sudo apt update
 sudo apt install supervisor
 ```
-Create a configuration file for the app:
+Create a configuration file for the dashboard_app:
 ```bash
-sudo nano /etc/supervisor/conf.d/tradex.conf
+sudo nano /etc/supervisor/conf.d/dashboard_app.conf:
 ```
 Add the following content:
 ```bash
-[program:tradex]
-command=python3 /path/to/app.py
-directory=/path/to/
+[program:dashboard_app]
+command=gunicorn -w 4 -b 0.0.0.0:5000 app:dashboard_app
+directory=/path/to/your/project
 autostart=true
 autorestart=true
-stderr_logfile=/var/log/tradex.err.log
-stdout_logfile=/var/log/tradex.out.log
-user=your-username
+stderr_logfile=/var/logs/dashboard_error.log
+stdout_logfile=/var/logs/logs/dashboard_access.log
+```
+Create a configuration file for the webhook_app:
+```bash
+sudo nano /etc/supervisor/conf.d/webhook_app.conf:
+```
+Add the following content:
+```bash
+[program:webhook_app]
+command=gunicorn -w 2 -b 0.0.0.0:5005 app:webhook_app
+directory=/path/to/your/project
+autostart=true
+autorestart=true
+stderr_logfile=/var/logs/webhook_error.log
+stdout_logfile=/var/logs/webhook_access.log
 ```
 ...and eplace /path/to/ with the directory where your app is located, and your-username with your system's username.
  Apply the Configuration, reload Supervisor and start the service:
  ```bash
 sudo supervisorctl reread
 sudo supervisorctl update
-sudo supervisorctl start tradexlog/tradex.out.log
+sudo supervisorctl start all
 ```
 Check the status of your app:
  ```bash
@@ -200,61 +213,92 @@ sudo supervisorctl status
 ```
 To stop or restart the app:
  ```bash
-sudo supervisorctl stop tradex
-sudo supervisorctl restart tradex
+sudo supervisorctl stop dashboard_app
+sudo supervisorctl restart dashboard_app
 ```
-Standard Output: /var/log/tradex.out.log
-Errors: /var/log/tradex.err.log
+- Standard Output: /var/log/xxx
+- Errors: /var/log/xxx
 
 ### Option 2: Using systemd
 
 #### Steps:
-Create a .service file for your app:
+Navigate to the /etc/systemd/system/ directory:
  ```bash
-sudo nano /etc/systemd/system/tradex.service
+cd /etc/systemd/system/
+```
+Create a new file for dashboard_app:
+ ```bash
+nano dashboard_app.service
 ```
 Add the following content:
  ```bash
 [Unit]
-Description=TradeX Service
+Description=Gunicorn instance to serve dashboard_app
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/python3 /path/to/app.py
-WorkingDirectory=/path/to/
+User=root
+Group=root
+WorkingDirectory=/path/to/your/project
+ExecStart=/path/to/your/virtualenv/bin/gunicorn -w 4 -b 0.0.0.0:5000 app:dashboard_app
 Restart=always
-User=your-username
-Group=your-group
-StandardOutput=append:/var/log/tradex.log
-StandardError=append:/var/log/tradex.err.log
 
 [Install]
 WantedBy=multi-user.target
 ```
-Replace /path/to/ with the directory where your app is located, and your-username and your-group with the appropriate system user and group.
+/path/to/your/project with the directory containing your app.py.
+/path/to/your/virtualenv/bin/gunicorn with the Gunicorn binary in your virtual environment.
+Create another service file for webhook_app:
+ ```bash
+nano webhook_app.service
+```
+Add the following configuration:
+ ```bash
+[Unit]
+Description=Gunicorn instance to serve webhook_app
+After=network.target
 
+[Service]
+User=root
+Group=root
+WorkingDirectory=/path/to/your/project
+ExecStart=/path/to/your/virtualenv/bin/gunicorn -w 2 -b 0.0.0.0:5005 app:webhook_app
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+
+```
 Reload systemd to recognize the new service:
  ```bash
 sudo systemctl daemon-reload
 ```
-Enable the service to start on boot:
+Start the services:
  ```bash
-sudo systemctl enable tradex.service
+systemctl start dashboard_app
+systemctl start webhook_app
 ```
-Start the service:
+Enable the services to start automatically on boot:
  ```bash
-sudo systemctl start tradex.service
+systemctl enable dashboard_app
+systemctl enable webhook_app
 ```
 Check the service status:
  ```bash
-sudo systemctl status tradex.service
+systemctl status dashboard_app
+systemctl status webhook_app
 ```
 View logs using journalctl:
  ```bash
-journalctl -u tradex.service -f
+journalctl -u dashboard_app
+journalctl -u webhook_app
 ```
-To stop or restart the service:
+To stop or restart and stop the service:
  ```bash
-sudo systemctl stop tradex.service
-sudo systemctl restart tradex.service
+systemctl restart dashboard_app
+systemctl restart webhook_app
+
+systemctl stop dashboard_app
+systemctl stop webhook_app
+
 ```
