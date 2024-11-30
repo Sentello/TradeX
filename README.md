@@ -71,8 +71,7 @@
 ## Usage
 
 ### Webhook Example (testing from curl)
-Webhook port is `5005`
-To place an order via the webhook, use the following examples:
+Webhook port is `5005`. To place an order via the webhook, use the following examples:
 
 ```bash
 curl -X POST http://<server-ip>:5005/webhook -H "Content-Type: application/json" -d '{
@@ -181,7 +180,7 @@ sudo nano /etc/supervisor/conf.d/dashboard_app.conf:
 Add the following content:
 ```bash
 [program:dashboard_app]
-command=gunicorn -w 4 -b 0.0.0.0:5000 app:dashboard_app
+command=gunicorn -w 2 -b 0.0.0.0:5000 app:dashboard_app
 directory=/path/to/your/project
 autostart=true
 autorestart=true
