@@ -201,7 +201,7 @@ autorestart=true
 stderr_logfile=/var/logs/webhook_error.log
 stdout_logfile=/var/logs/webhook_access.log
 ```
-...and eplace /path/to/ with the directory where your app is located, and your-username with your system's username.
+... and replace /path/to/ with the directory where your app is located.
  Apply the Configuration, reload Supervisor and start the service:
  ```bash
 sudo supervisorctl reread
