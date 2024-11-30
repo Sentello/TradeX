@@ -74,7 +74,7 @@
 To place an order via the webhook, use the following examples:
 
 ```bash
-curl -X POST http://<server-ip>:5000/webhook -H "Content-Type: application/json" -d '{
+curl -X POST http://<server-ip>:5005/webhook -H "Content-Type: application/json" -d '{
     "PIN": "123456",
     "EXCHANGE": "bybit",
     "SYMBOL": "BTCUSDT",
@@ -86,7 +86,7 @@ curl -X POST http://<server-ip>:5000/webhook -H "Content-Type: application/json"
 Place a Limit Order
 
 ```bash
-curl -X POST http://<server-ip>:5000/webhook -H "Content-Type: application/json" -d '{
+curl -X POST http://<server-ip>:5005/webhook -H "Content-Type: application/json" -d '{
     "PIN": "123456",
     "EXCHANGE": "binance",
     "SYMBOL": "ETHUSDT",
@@ -100,7 +100,7 @@ curl -X POST http://<server-ip>:5000/webhook -H "Content-Type: application/json"
 Place a Market Order
 
 ```bash
-curl -X POST http://192.168.1.8:5000/webhook -H "Content-Type: application/json" -d '{
+curl -X POST http://192.168.1.8:5005/webhook -H "Content-Type: application/json" -d '{
     "PIN": "123456",
     "EXCHANGE": "bybit",
     "SYMBOL": "BTCUSDT",
@@ -114,7 +114,7 @@ curl -X POST http://192.168.1.8:5000/webhook -H "Content-Type: application/json"
 Place a Market Sell Order
 
 ```bash
-curl -X POST http://192.168.1.8:5000/webhook -H "Content-Type: application/json" -d '{
+curl -X POST http://192.168.1.8:5005/webhook -H "Content-Type: application/json" -d '{
     "PIN": "123456",
     "EXCHANGE": "bybit",
     "SYMBOL": "BTCUSDT",
@@ -127,7 +127,7 @@ curl -X POST http://192.168.1.8:5000/webhook -H "Content-Type: application/json"
 Place a Limit Order with Stop Loss and Take Profit
 
 ```bash
-curl -X POST http://<server-ip>:5000/webhook -H "Content-Type: application/json" -d '{
+curl -X POST http://<server-ip>:5005/webhook -H "Content-Type: application/json" -d '{
     "PIN": "123456",
     "EXCHANGE": "bybit",
     "SYMBOL": "BTCUSDT",
@@ -152,6 +152,7 @@ The same logic applies as with cURL, but keep the content within the curly brack
     "QUANTITY": 0.01
 }
 ```
+Please note that TradingView can only use webhooks on ports 80 or 443. This means you'll need to proxy your webhook port to either 80 or 443, depending on your requirements. I strongly recommend using port 80 to avoid potential SSL-related complications and suggest using Nginx as a proxy for this setup.
 
 ## Running the App as a Service
 
@@ -293,7 +294,7 @@ View logs using journalctl:
 journalctl -u dashboard_app
 journalctl -u webhook_app
 ```
-To stop or restart and stop the service:
+To stop or restart service:
  ```bash
 systemctl restart dashboard_app
 systemctl restart webhook_app
