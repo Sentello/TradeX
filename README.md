@@ -304,4 +304,34 @@ systemctl stop webhook_app
 ```
 
 ## Running the TradeX as a Docker
-bla bla bla
+Before you begin, ensure you have the following installed on your system:
+- [Git](https://git-scm.com/)
+- [Docker](https://www.docker.com/)
+- [Docker Compose](https://docs.docker.com/compose/)
+
+---
+Clone the `tradex` repository from GitHub to your local machine:
+```bash
+git clone https://github.com/Sentello/tradex.git
+```
+ ```bash
+cd tradex
+docker-compose up --build -d
+```
+Ensure the application container is running:
+ ```bash
+docker ps | grep tradex
+```
+To stop the application, use:
+ ```bash
+docker-compose down
+```
+For logs and debugging, run:
+ ```bash
+docker-compose logs -f
+```
+Update the application by pulling the latest changes and rebuilding:
+ ```bash
+git pull origin main
+docker-compose up --build -d
+```
