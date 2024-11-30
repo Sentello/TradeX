@@ -64,13 +64,14 @@
     ```
 
 6. Access the dashboard:
-    Open your browser and go to `http://localhost:5000`.
+    - Open your browser and go to `http://localhost:5000`.
 
 ---
 
 ## Usage
 
 ### Webhook Example (testing from curl)
+Webhook port is `5005`
 To place an order via the webhook, use the following examples:
 
 ```bash
