@@ -301,5 +301,7 @@ systemctl restart webhook_app
 
 systemctl stop dashboard_app
 systemctl stop webhook_app
-
 ```
+
+## Running the App as a Docker
+bla bla bla
