@@ -3,7 +3,7 @@ version: '3.8'
 services:
   tradex:
     build: .
-    container_name: tradex-app
+    container_name: tradex
     ports:
       - "5000:5000"  # Map Dashboard
       - "5005:5005"  # Map Webhook
