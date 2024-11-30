@@ -320,12 +320,12 @@ Before you begin, ensure you have the following installed on your system:
 - [Docker Compose](https://docs.docker.com/compose/)
 
 ---
-Before you start you need to customize environment variables.
-
 Clone the `tradex` repository from GitHub to your local machine:
 ```bash
 git clone https://github.com/Sentello/tradex.git
 ```
+Before you start you need to customize environment variables. 
+
 Build and start the application
  ```bash
 cd tradex
