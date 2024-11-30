@@ -154,7 +154,7 @@ The same logic applies as with cURL, but keep the content within the curly brack
 ```
 Please note that TradingView can only use webhooks on ports 80 or 443. This means you'll need to proxy your webhook port to either 80 or 443, depending on your requirements. I strongly recommend using port 80 to avoid potential SSL-related complications and suggest using Nginx as a proxy for this setup.
 
-## Running the App as a Service
+## Running the TradeX as a Service
 
 You can run the app as a service using two methods:
 
@@ -303,5 +303,5 @@ systemctl stop dashboard_app
 systemctl stop webhook_app
 ```
 
-## Running the App as a Docker
+## Running the TradeX as a Docker
 bla bla bla
