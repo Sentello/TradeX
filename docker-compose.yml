@@ -9,4 +9,4 @@ services:
       - "5005:5005"  # Map Webhook
     volumes:
       - ./logs:/app/logs  # Map logs to host directory
-    restart: always       # Restart container on failure
+    restart: always
