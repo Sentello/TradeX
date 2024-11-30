@@ -11,6 +11,7 @@
 - [Usage](#usage)
 - [Running TradeX as a Service](#running-tradex-as-a-service)
 - [Running TradeX in Docker](#running-tradex-in-docker)
+- [Using Nginx as a Proxy for Webhooks](#using-nginx-as-a-proxy-for-webhooks)
 
 ---
 
@@ -349,3 +350,43 @@ Update the application by pulling the latest changes and rebuilding:
 git pull origin main
 docker-compose up --build -d
 ```
+## Using Nginx as a Proxy for Webhooks
+
+If you decide not to change the webhook port from `5005` to port `80` or `443`, you can use Nginx as a reverse proxy. This will allow external services (like TradingView) to access your webhook while maintaining the original application port.
+
+### Steps to Set Up Nginx as a Proxy
+
+1. **Install Nginx**:
+   First, install Nginx on your server:
+   ```bash
+   sudo apt update
+   sudo apt install nginx
+   ```
+2. **Create a New Nginx Configuration**:
+  ```bash
+   sudo nano /etc/nginx/sites-available/tradex-webhook
+   ```
+Add the following content:
+  ```bash
+server {
+    listen 80;
+    server_name your.domain.com; # Replace with your domain or server IP
+
+    location /webhook {
+        proxy_pass http://127.0.0.1:5005; # Proxy to your local webhook
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+   ```
+3. **Enable the New Configuration**:
+```bash
+sudo ln -s /etc/nginx/sites-available/tradex-webhook /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl restart nginx
+   ```
+4. **Update Your Webhook URL**:
+When sending webhooks (from TradingView), use the new URL pointing to your domain or server IP on port 80: `http://your.domain.com/webhook`
