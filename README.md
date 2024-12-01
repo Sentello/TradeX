@@ -227,6 +227,8 @@ To stop or restart the app:
  ```bash
 sudo supervisorctl stop dashboard_app
 sudo supervisorctl restart dashboard_app
+sudo supervisorctl stop webhook_app
+sudo supervisorctl restart webhook_app
 ```
 - Standard Output: /var/log/xxx
 - Errors: /var/log/xxx
