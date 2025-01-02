@@ -111,7 +111,7 @@ curl -X POST http://<server-ip>:5005/webhook -H "Content-Type: application/json"
 Place a Market Order
 
 ```bash
-curl -X POST http://192.168.1.8:5005/webhook -H "Content-Type: application/json" -d '{
+curl -X POST http://<server-ip>:5005/webhook -H "Content-Type: application/json" -d '{
     "PIN": "123456",
     "EXCHANGE": "bybit",
     "SYMBOL": "BTCUSDT",
@@ -125,7 +125,7 @@ curl -X POST http://192.168.1.8:5005/webhook -H "Content-Type: application/json"
 Place a Market Sell Order
 
 ```bash
-curl -X POST http://192.168.1.8:5005/webhook -H "Content-Type: application/json" -d '{
+curl -X POST http://<server-ip>:5005/webhook -H "Content-Type: application/json" -d '{
     "PIN": "123456",
     "EXCHANGE": "bybit",
     "SYMBOL": "BTCUSDT",
