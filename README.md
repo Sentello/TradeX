@@ -329,7 +329,7 @@ Clone the `tradex` repository from GitHub to your local machine:
 ```bash
 git clone https://github.com/Sentello/tradex.git
 ```
-Before you start you need to customize environment variables. 
+Then you need to customize environment variables, `config.py` and  take a look at the `docker-compose.yml`
 
 Build and start the application
  ```bash
