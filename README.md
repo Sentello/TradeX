@@ -165,6 +165,7 @@ The same logic applies as with cURL, but keep the content within the curly brack
 ```
 
 TradingView requires placeholders to be within quotes if the replacement value is not numeric. For example SIDE and QUANTITY, even though the value might be numeric in case of QUANTITY, the placeholder must be quoted to prevent JSON parsing errors when pasting into TradingView.
+```bash
 {
     "PIN": "123456",
     "EXCHANGE": "bybit",
@@ -173,6 +174,7 @@ TradingView requires placeholders to be within quotes if the replacement value i
     "ORDER_TYPE": "market",
     "QUANTITY": "{{strategy.order.contracts}}"
 }
+```
 
 **Please note that TradingView can only use webhooks on ports 80 or 443. This means you'll need to proxy your webhook port to either 80 or 443, depending on your requirements. I strongly recommend using port 80 to avoid potential SSL-related complications and suggest using Nginx as a proxy for this setup.**
 
