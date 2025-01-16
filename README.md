@@ -108,6 +108,18 @@ curl -X POST http://<server-ip>:5005/webhook -H "Content-Type: application/json"
 }'
 ```
 
+```bash
+curl -X POST http://<server-ip>:5005/webhook -H "Content-Type: application/json" -d '{
+    "PIN": "123456",
+    "EXCHANGE": "bybit",
+    "SYMBOL": "BTCUSDT",
+    "SIDE": "buy",
+    "ORDER_TYPE": "limit",
+    "QUANTITY": 0.05,
+    "PRICE": 91000
+}'
+```
+
 Place a Market Order
 
 ```bash
