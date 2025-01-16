@@ -13,18 +13,26 @@ RUN apt-get update && apt-get install -y \
 # Create necessary directories
 RUN mkdir -p /app/logs /var/log/supervisor
 
-# Copy the current directory contents into the container at /app
+# Copy application files and .env
 COPY . /app
+COPY .env /app/.env
 
-# Install any needed packages specified in requirements.txt
+# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy supervisor configuration
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
+# Set permissions for logs directory
+RUN chmod -R 777 /app/logs
+
 # Expose the ports for the Flask apps
 EXPOSE 5000
 EXPOSE 5005
 
+# Add a health check
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD curl -sf http://localhost:5000 && curl -sf http://localhost:5005 || exit 1
+
 # Default command to start supervisord
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+

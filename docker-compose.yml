@@ -3,10 +3,12 @@ version: '3.8'
 services:
   tradex:
     build: .
-    container_name: tradex
+    container_name: tradex-app
     ports:
       - "5000:5000"  # Map Dashboard
       - "5005:5005"  # Map Webhook
+    env_file:
+      - .env
     volumes:
       - ./logs:/app/logs  # Map logs to host directory
-    restart: always
+    restart: always       # Restart container on failure

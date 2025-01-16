@@ -4,12 +4,14 @@ from logging.handlers import RotatingFileHandler
 from bot_logic import execute_order, get_positions, get_pending_orders, close_position, close_all_positions, cancel_order
 from config import WEBHOOK_PIN
 from config import DASHBOARD_PASSWORD
+from datetime import timedelta
 
 
 # Web Dashboard
 dashboard_app = Flask(__name__)
 dashboard_app.secret_key = secrets.token_hex(32)
 dashboard_app.config.update(
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=12),
     SESSION_COOKIE_SECURE=False, # Set True if using HTTPS
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Strict'
@@ -32,6 +34,8 @@ def login_required(func):
     from functools import wraps
     @wraps(func)
     def decorated_view(*args, **kwargs):
+        # Make the session permanent
+        session.permanent = True
         if not session.get("logged_in"):
             return redirect(url_for("login"))
         return func(*args, **kwargs)
@@ -42,7 +46,10 @@ def login():
     if request.method == "POST":
         password = request.form.get("password")
         if password == DASHBOARD_PASSWORD:
+            # Set session variables and make it permanent
             session["logged_in"] = True
+            session["user_authenticated"] = True  # Example flag for security
+            session.permanent = True
             return redirect(url_for("index"))
         else:
             return render_template("login.html", error="Invalid password")
@@ -50,7 +57,7 @@ def login():
 
 @dashboard_app.route("/logout")
 def logout():
-    session.pop("logged_in", None)
+    session.clear()  # Clear all session data instead of just "logged_in"
     return redirect(url_for("login"))
 
 @dashboard_app.route('/')
