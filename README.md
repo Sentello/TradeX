@@ -164,7 +164,7 @@ The same logic applies as with cURL, but keep the content within the curly brack
 }
 ```
 
-TradingView requires placeholders to be within quotes if the replacement value is not numeric. For example SIDE and QUANTITY, even though the value might be numeric in case of QUANTITY, the placeholder must be quoted to prevent JSON parsing errors when pasting into TradingView.
+If you're using strategy, TradingView requires placeholders to be within quotes if the replacement value is not numeric. For example SIDE and QUANTITY, even though the value might be numeric in case of QUANTITY, the placeholder must be quoted to prevent JSON parsing errors when pasting into TradingView.
 ```bash
 {
     "PIN": "123456",
