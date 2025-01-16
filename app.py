@@ -5,11 +5,13 @@ from bot_logic import execute_order, get_positions, get_pending_orders, close_po
 from config import WEBHOOK_PIN
 from config import DASHBOARD_PASSWORD
 from datetime import timedelta
+import os
 
 
 # Web Dashboard
 dashboard_app = Flask(__name__)
-dashboard_app.secret_key = secrets.token_hex(32)
+# dashboard_app.secret_key = secrets.token_hex(32)
+dashboard_app.secret_key = os.getenv("FLASK_SECRET_KEY", "hardcoded-default-key")
 dashboard_app.config.update(
     PERMANENT_SESSION_LIFETIME=timedelta(hours=12),
     SESSION_COOKIE_SECURE=False, # Set True if using HTTPS
