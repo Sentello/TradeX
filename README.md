@@ -66,8 +66,8 @@
     ```
 
 4. Configure your environment variables:
-    - Edit the config file `config.py`.
-    - Add your exchange API keys, dashboard password, and PIN in `config.py`.
+    - Edit the config file `.env`.
+    - Add your exchange API keys, dashboard password, and PIN in `.env`.
 
 5. Run the application:
     ```bash
