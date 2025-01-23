@@ -26,7 +26,7 @@ webhook_app = Flask(__name__)
 file_handler = RotatingFileHandler('logs/bot.log', maxBytes=2000000, backupCount=5)
 console_handler = logging.StreamHandler()
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[file_handler, console_handler]
 )
