@@ -17,7 +17,7 @@
 
 ## Features
 
-- **Multi-Exchange Support**: Seamlessly works with Bybit, Binance, and other CCXT-supported exchanges.
+- **Multi-Exchange Support**: Seamlessly works with Bybit and Binance.
 - **Order Management**: Place, modify, and cancel orders directly from the dashboard.
 - **Pending and Open Positions**: View all your active and pending orders in a user-friendly interface.
 - **Close All Positions**: Quickly close all open positions with a single click.
