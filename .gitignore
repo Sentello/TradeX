@@ -1,3 +1,4 @@
 # Ignore .env file and pyhon env
 .env
 venv/
+logs/
