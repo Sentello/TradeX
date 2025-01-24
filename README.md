@@ -33,6 +33,9 @@
 ---
 
 ## Supported Exchanges
+![image](https://github.com/user-attachments/assets/ce33b5e5-0d4d-411e-9821-50e12414a7f2)  ![image](https://github.com/user-attachments/assets/ab0da857-493e-4824-ab3e-0d87fb05a0b0)
+
+
 - Bybit Futures
 - Binance Futures (not fully tested)
 - Additional changes can be made upon request, or you can contribute by submitting a pull request
