@@ -33,7 +33,8 @@
 ---
 
 ## Supported Exchanges
-![image](https://github.com/user-attachments/assets/ce33b5e5-0d4d-411e-9821-50e12414a7f2)  ![image](https://github.com/user-attachments/assets/ab0da857-493e-4824-ab3e-0d87fb05a0b0)
+<img src="https://github.com/user-attachments/assets/ce33b5e5-0d4d-411e-9821-50e12414a7f2" alt="image" width="100px">   
+<img src="https://github.com/user-attachments/assets/ab0da857-493e-4824-ab3e-0d87fb05a0b0" alt="image" width="100px">
 
 
 - Bybit Futures
@@ -410,3 +411,6 @@ If you decide not to change the webhook port from `5005` to port `80` or `443`, 
    ```
 4. **Update Your Webhook URL**:
    When sending webhooks (from TradingView), use the new URL pointing to your domain or server IP on port 80: `http://your.domain.com/webhook`
+
+---
+<img src="https://media1.tenor.com/m/ofDuH0hvGh8AAAAd/so-what-do-you-think.gif" width="200" title="Ray Romano saying What do you think?" alt="Ray Romano saying What do you think?"/>
