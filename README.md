@@ -127,6 +127,8 @@ When running in **Dual Mode**, it’s important to configure your TradingView al
 - **Tick "Webhook URL" Only**: Use this for signals that require fast execution.
 - **Avoid Ticking Both Boxes**: If both options are selected, the same signal will be sent twice—once via webhook and once via email. This could result in duplicate orders being placed.
 
+  ![image](https://github.com/user-attachments/assets/6d3f4a4f-dde8-42ee-b853-f4d8b5801bea)
+
 TradeX does not currently include a deduplication mechanism, so it’s up to the user to configure TradingView alerts appropriately. For example:
 - High-priority signals (e.g., scalping strategies) can be sent via webhook for fast execution.
 - Lower-priority signals (e.g., long-term position adjustments) can be sent via email for guaranteed delivery.
