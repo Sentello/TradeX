@@ -1,4 +1,7 @@
-# Ignore .env file and Pyhon env
+# gitignore
+__pycache__/
+*.pyc
+*.pyo
 .env
 venv/
 logs/

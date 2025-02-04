@@ -1,14 +1,17 @@
-version: '3.8'
+version: "3.8"
 
 services:
-  tradex:
+  tradex_app:
     build: .
-    container_name: tradex-app
-    ports:
-      - "5000:5000"  # Map Dashboard
-      - "5005:5005"  # Map Webhook
+    container_name: tradex_container
+    restart: unless-stopped
     env_file:
       - .env
-    volumes:
-      - ./logs:/app/logs  # Map logs to host directory
-    restart: always       # Restart container on failure
+    ports:
+      - "5000:5000"  # Dashboard
+      - "5005:5005"  # Webhook
+    #volumes:
+      #- .:/app
+      #- ./logs:/var/log
+      #- ./logs:/app/logs
+    command: /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf

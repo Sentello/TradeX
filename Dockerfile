@@ -1,38 +1,37 @@
-# Use an official Python runtime as a parent image
-FROM python:3.8-slim
+# Use Python 3.10 as the base image
+FROM python:3.10
 
-# Set the working directory in the container
+# Set the working directory inside the container
 WORKDIR /app
 
-# Install necessary system packages
+# Copy the application files to the container
+COPY . /app
+COPY .env /app/.env
+
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     supervisor \
-    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Create necessary directories
-RUN mkdir -p /app/logs /var/log/supervisor
+#RUN mkdir -p /var/log/supervisor /app/logs
 
-# Copy application files and .env
-COPY . /app
-COPY .env /app/.env
+# Set permissions for logs directory
+#RUN chmod -R 777 /var/log/supervisor /app/logs
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy supervisor configuration
+# Copy the Supervisor configuration file
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-# Set permissions for logs directory
-RUN chmod -R 777 /app/logs
+# Expose ports for Flask applications
+EXPOSE 5000 5005
 
-# Expose the ports for the Flask apps
-EXPOSE 5000
-EXPOSE 5005
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+  CMD curl -sf http://localhost:5000/login >/dev/null && \
+      curl -s -o /dev/null -w "%{http_code}" http://localhost:5005/webhook | grep -qE '[2-4][0-9][0-9]' || exit 1
 
-# Add a health check
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD curl -sf http://localhost:5000 && curl -sf http://localhost:5005 || exit 1
-
-# Default command to start supervisord
+# Supervisor
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
-

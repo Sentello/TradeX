@@ -1,226 +1,201 @@
 import ccxt
 import logging
-from config import BYBIT_API_KEY, BYBIT_API_SECRET, BINANCE_API_KEY, BINANCE_API_SECRET
+import config
+import os
+from logging.handlers import RotatingFileHandler
 
-# Initialize CCXT exchanges dynamically
+# Setup logging
+if os.getenv("DOCKER_ENV"):
+    log_directory = "/app/logs"  # Inside Docker
+else:
+    log_directory = "logs"  # Local execution
+os.makedirs(log_directory, exist_ok=True)
+log_file_path = os.path.join(log_directory, "trading.log")
+file_handler = RotatingFileHandler(log_file_path, maxBytes=2_000_000, backupCount=5)
+console_handler = logging.StreamHandler()
+
+logger = logging.getLogger("trading")
+logger.setLevel(logging.INFO)
+formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s")
+file_handler.setFormatter(formatter)
+console_handler.setFormatter(formatter)
+# add handlers to logger
+logger.addHandler(file_handler)
+logger.addHandler(console_handler)
+
+logger.info("🔄 Initializing exchanges...")
+
+
+# Initialize exchanges dictionary
 exchanges = {}
 
-if BYBIT_API_KEY and BYBIT_API_SECRET:
-    exchanges["bybit"] = ccxt.bybit({
-        'apiKey': BYBIT_API_KEY,
-        'secret': BYBIT_API_SECRET,
-        'enableRateLimit': True,
-    })
-
-if BINANCE_API_KEY and BINANCE_API_SECRET:
-    exchanges["binance"] = ccxt.binance({
-        'apiKey': BINANCE_API_KEY,
-        'secret': BINANCE_API_SECRET,
-        'enableRateLimit': True,
-    })
-
-def initialize_bot():
-    """Initialize the bot by loading markets for all configured exchanges."""
-    for exchange_name, exchange in exchanges.items():
-        try:
-            exchange.load_markets()
-            logging.info(f"Markets loaded for {exchange_name}")
-        except Exception as e:
-            logging.error(f"Failed to load markets for {exchange_name}: {e}")
-
-def execute_order(data):
+if config.BYBIT_API_KEY and config.BYBIT_API_SECRET:
+    logger.info("🔄 Setting up Bybit API...")
     try:
-        exchange_name = data['EXCHANGE'].lower()
-        if exchange_name not in exchanges:
-            raise ValueError(f"Exchange {exchange_name} is not supported.")
-
-        exchange = exchanges[exchange_name]
-        symbol = data['SYMBOL']
-        side = data['SIDE'].lower()
-        order_type = data['ORDER_TYPE'].lower()
-        quantity = float(data['QUANTITY'])
-        price = float(data.get('PRICE', 0))
-        stop_loss = float(data.get('STOP_LOSS', 0))
-        take_profit = float(data.get('TAKE_PROFIT', 0))
-
-        logging.info(f"Placing order on {exchange_name}: {data}")
-
-        # Place main order
-        response = exchange.create_order(
-            symbol=symbol,
-            type=order_type,
-            side=side,
-            amount=quantity,
-            price=price if order_type == 'limit' else None
-        )
-        logging.info(f"{exchange_name.capitalize()} main order response: {response}")
-
-        if exchange_name == "bybit":
-            # TP and SL logic for Bybit
-            handle_bybit_tp_sl(exchange, symbol, side, quantity, price, take_profit, stop_loss)
-
-        elif exchange_name == "binance":
-            # TP and SL logic for Binance
-            handle_binance_tp_sl(exchange, symbol, side, quantity, take_profit, stop_loss)
-
-        return {"status": "success", "data": response}
-
+        exchanges['bybit'] = ccxt.bybit({
+            'apiKey': config.BYBIT_API_KEY,
+            'secret': config.BYBIT_API_SECRET
+        })
+        logger.info("✅ Bybit successfully initialized!")
     except Exception as e:
-        logging.error(f"Failed to place order: {str(e)}", exc_info=True)
-        return {"status": "error", "message": str(e)}
+        logger.error(f"❌ Error initializing Bybit: {e}")
 
-def handle_bybit_tp_sl(exchange, symbol, side, quantity, base_price, take_profit, stop_loss):
+if config.BINANCE_API_KEY and config.BINANCE_API_SECRET:
+    logger.info("🔄 Setting up Binance API...")
     try:
-        if take_profit > 0:
-            tp_response = exchange.private_post_v5_order_create({
-                "symbol": symbol,
-                "side": "Sell" if side == "buy" else "Buy",
-                "orderType": "TakeProfit",
-                "qty": quantity,
-                "basePrice": base_price,
-                "stopPx": take_profit,
-                "triggerBy": "LastPrice",
-                "reduce_only": True,
-                "category": "linear"
-            })
-            logging.info(f"Bybit Take Profit Response: {tp_response}")
-        if stop_loss > 0:
-            sl_response = exchange.private_post_v5_order_create({
-                "symbol": symbol,
-                "side": "Sell" if side == "buy" else "Buy",
-                "orderType": "StopLoss",
-                "qty": quantity,
-                "basePrice": base_price,
-                "stopPx": stop_loss,
-                "triggerBy": "LastPrice",
-                "reduce_only": True,
-                "category": "linear"
-            })
-            logging.info(f"Bybit Stop Loss Response: {sl_response}")
+        exchanges['binance'] = ccxt.binance({
+            'apiKey': config.BINANCE_API_KEY,
+            'secret': config.BINANCE_API_SECRET
+        })
+        logger.info("✅ Binance successfully initialized!")
     except Exception as e:
-        logging.error(f"Error in Bybit TP/SL creation: {str(e)}")
+        logger.error(f"❌ Error initializing Binance: {e}")
 
-def handle_binance_tp_sl(exchange, symbol, side, quantity, take_profit, stop_loss):
-    try:
-        if take_profit > 0 or stop_loss > 0:
-            oco_params = {
-                "symbol": symbol.replace('/', ''),
-                "side": "sell" if side == "buy" else "buy",
-                "quantity": quantity,
-                "price": take_profit,
-                "stopPrice": stop_loss,
-                "stopLimitPrice": stop_loss,
-                "stopLimitTimeInForce": "GTC",
-            }
-            oco_response = exchange.sapi_post_order_oco(**oco_params)
-            logging.info(f"Binance OCO Order Response: {oco_response}")
-    except Exception as e:
-        logging.error(f"Error in Binance OCO creation: {str(e)}")
+# Log final exchange state
+if exchanges:
+    logger.info(f"🎉 Loaded exchanges: {list(exchanges.keys())}")
+else:
+    logger.error("❌ No exchanges loaded! Double-check API keys and config.")
+
+# ==============================
+# 🚀 Functions for Trading Logic
+# ==============================
 
 def get_positions():
+    """Returns a dict of exchange_name -> list of open positions."""
+    logger.info("📊 Fetching open positions...")
     positions_data = {}
+
+    if not exchanges:
+        logger.error("❌ No exchanges loaded! Check API keys and config.")
+        return positions_data
+
     for exchange_name, exchange in exchanges.items():
         positions_data[exchange_name] = []
         try:
-            # Fetch positions from the exchange
-            positions = exchange.fetch_positions()
-
-            # Process the positions
-            for position in positions:
-                if position.get('contracts') and position['contracts'] > 0:
+            all_positions = exchange.fetch_positions()
+            for pos in all_positions:
+                if pos.get('contracts', 0) > 0:  # Only return active positions
                     positions_data[exchange_name].append({
-                        "symbol": position.get('symbol', 'N/A'),
-                        "contracts": position.get('contracts', 'N/A'),
-                        "value": position.get('notional', 'N/A'),
-                        "entry_price": position.get('entryPrice', 'N/A'),
-                        "liquidation_price": position.get('liquidationPrice', 'N/A') or "N/A",
-                        "position_margin": position.get('initialMargin', 'N/A'),
-                        "unrealized_pnl": position.get('unrealizedPnl', 'N/A'),
-                        "exchange": exchange_name,
+                        "symbol": pos.get('symbol', 'N/A'),
+                        "side": pos.get('side', 'N/A'),
+                        "contracts": pos.get('contracts', 0),
+                        "notional": pos.get('notional', 0.0),
+                        "entry_price": pos.get('entryPrice', 0.0),
+                        "liquidation_price": pos.get('liquidationPrice', None),
+                        "unrealized_pnl": pos.get('unrealizedPnl', 0.0),
+                        "exchange": exchange_name
                     })
         except Exception as e:
-            logging.error(f"Error fetching positions for {exchange_name}: {e}")
+            logger.error(f"❌ [get_positions] Error fetching positions for {exchange_name}: {e}")
+
+    logger.info(f"📊 Final positions data: {positions_data}")
     return positions_data
 
+
 def get_pending_orders():
+    """Fetches and returns pending (open) orders for each exchange."""
+    logger.info("📋 Fetching pending orders...")
     pending_orders = {}
+
+    if not exchanges:
+        logger.error("❌ No exchanges loaded! Check API keys and config.")
+        return pending_orders
+
     for exchange_name, exchange in exchanges.items():
+        pending_orders[exchange_name] = []
         try:
             orders = exchange.fetch_open_orders()
-            pending_orders[exchange_name] = [
-                {
-                    "id": order['id'],
-                    "symbol": order['symbol'],
-                    "type": order['type'],
-                    "side": order['side'],
-                    "price": order['price'],
-                    "quantity": order['amount']
-                }
-                for order in orders
-            ]
+            pending_orders[exchange_name] = orders
         except Exception as e:
-            logging.error(f"Error fetching pending orders from {exchange_name}: {e}")
-            pending_orders[exchange_name] = []
+            logger.error(f"❌ [get_pending_orders] Error fetching orders for {exchange_name}: {e}")
+
     return pending_orders
 
-def close_position(exchange_name, symbol):
+
+def execute_order(exchange_name, symbol, side, order_type, quantity, price=None):
+    """Places an order on the specified exchange."""
+    logger.info(f"📌 Executing order on {exchange_name}: {side} {quantity} {symbol} ({order_type}) at {price if price else 'market price'}")
+
     if exchange_name not in exchanges:
-        return {"status": "error", "message": f"Exchange {exchange_name} is not supported."}
+        logger.error(f"❌ Exchange {exchange_name} not available.")
+        return {"status": "error", "message": f"Exchange {exchange_name} not found."}
 
     exchange = exchanges[exchange_name]
+
     try:
-        positions = exchange.fetch_positions()
-        position_to_close = next((pos for pos in positions if pos['symbol'] == symbol), None)
+        if order_type == "market":
+            order = exchange.create_market_order(symbol, side, quantity)
+        elif order_type == "limit" and price:
+            order = exchange.create_limit_order(symbol, side, quantity, price)
+        else:
+            logger.error(f"❌ Invalid order type: {order_type}")
+            return {"status": "error", "message": "Invalid order type"}
 
-        if not position_to_close or position_to_close['contracts'] == 0:
-            return {"status": "error", "message": f"No open position found for {symbol} on {exchange_name}."}
+        logger.info(f"✅ Order placed successfully: {order}")
+        return {"status": "success", "order": order}
 
-        side = "sell" if position_to_close['side'] == "long" else "buy"
-        amount = abs(position_to_close['contracts'])
-
-        response = exchange.create_order(
-            symbol=symbol,
-            type="market",
-            side=side,
-            amount=amount
-        )
-        return {"status": "success", "response": response}
     except Exception as e:
-        logging.error(f"Error closing position on {exchange_name}: {e}")
+        logger.error(f"❌ Error executing order on {exchange_name}: {e}")
         return {"status": "error", "message": str(e)}
 
-def close_all_positions():
-    results = {}
-    for exchange_name, exchange in exchanges.items():
-        try:
-            positions = exchange.fetch_positions()
-            for position in positions:
-                if position['contracts'] > 0:
-                    symbol = position['symbol']
-                    side = "sell" if position['side'] == "long" else "buy"
-                    amount = abs(position['contracts'])
 
-                    response = exchange.create_order(
-                        symbol=symbol,
-                        type="market",
-                        side=side,
-                        amount=amount
-                    )
-                    results[symbol] = {"status": "success", "response": response}
-        except Exception as e:
-            logging.error(f"Error closing all positions for {exchange_name}: {e}")
-            results[exchange_name] = {"status": "error", "message": str(e)}
+def close_position(exchange_name, symbol):
+    """Closes an open position."""
+    logger.info(f"❌ Closing position for {symbol} on {exchange_name}...")
 
-    return results
-
-def cancel_order(exchange_name, order_id, symbol):
     if exchange_name not in exchanges:
-        return {"status": "error", "message": f"Exchange {exchange_name} is not supported."}
+        logger.error(f"❌ Exchange {exchange_name} not available.")
+        return {"status": "error", "message": f"Exchange {exchange_name} not found."}
 
     exchange = exchanges[exchange_name]
+
     try:
-        response = exchange.cancel_order(order_id, symbol)
-        return {"status": "success", "response": response}
+        positions = get_positions().get(exchange_name, [])
+        for pos in positions:
+            if pos["symbol"] == symbol:
+                side = "sell" if pos["side"] == "buy" else "buy"
+                order = exchange.create_market_order(symbol, side, pos["contracts"])
+                logger.info(f"✅ Position closed: {order}")
+                return {"status": "success", "order": order}
+
+        logger.warning(f"⚠ No open position found for {symbol}.")
+        return {"status": "error", "message": "No open position found."}
+
     except Exception as e:
-        logging.error(f"Error canceling order on {exchange_name}: {e}")
+        logger.error(f"❌ Error closing position: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+def close_all_positions():
+    """Closes all open positions on all exchanges."""
+    logger.info("❌ Closing all open positions...")
+
+    results = {}
+    for exchange_name, exchange in exchanges.items():
+        positions = get_positions().get(exchange_name, [])
+        for pos in positions:
+            result = close_position(exchange_name, pos["symbol"])
+            results[pos["symbol"]] = result
+
+    logger.info(f"✅ All positions closed: {results}")
+    return results
+
+
+def cancel_order(exchange_name, order_id, symbol):
+    """Cancels a specific order."""
+    logger.info(f"🚫 Cancelling order {order_id} on {exchange_name}...")
+
+    if exchange_name not in exchanges:
+        logger.error(f"❌ Exchange {exchange_name} not available.")
+        return {"status": "error", "message": f"Exchange {exchange_name} not found."}
+
+    exchange = exchanges[exchange_name]
+
+    try:
+        result = exchange.cancel_order(order_id, symbol)
+        logger.info(f"✅ Order {order_id} cancelled successfully.")
+        return {"status": "success", "order": result}
+    except Exception as e:
+        logger.error(f"❌ Error cancelling order {order_id}: {e}")
         return {"status": "error", "message": str(e)}

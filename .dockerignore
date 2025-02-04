@@ -1,6 +1,8 @@
+# dockerignore
 __pycache__/
 *.pyc
 *.pyo
 logs/
 my_bot_env/
 .git
+venv/

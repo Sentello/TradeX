@@ -1,97 +1,225 @@
 # TradeX
 
-**TradeX** is an advanced, web-based trading bot designed to integrate seamlessly with **TradingView webhooks** and automate cryptocurrency trading across major exchanges like **Binance** and **Bybit**. It empowers traders with the ability to execute trades triggered by real-time TradingView alerts, providing a reliable and customizable solution for automated trading. Key features include authentication measures and configurable PIN protection for trade execution, ensuring secure transactions. TradeX aims to simplify the complexities of cryptocurrency trading, making it accessible for both novice and experienced traders.
+**TradeX** is an advanced, web-based trading bot designed to automate cryptocurrency trading across major exchanges like **Binance** and **Bybit**. It integrates seamlessly with **TradingView webhooks** and **email alerts**, enabling real-time trade execution based on custom signals. The system provides a secure and user-friendly dashboard for managing open positions, pending orders, and executing trades.
+
+Key features include:
+- Multi-exchange support (Bybit, Binance).
+- Secure authentication and PIN protection for trade execution.
+- Real-time monitoring of open positions and pending orders.
+- Support for both webhook and email-based signal ingestion.
+- Containerized deployment using Docker.
 
 ---
+
 ## Table of Contents
 - [Features](#features)
 - [Screenshots](#screenshots)
 - [Supported Exchanges](#supported-exchanges)
+- [Supported Modes](#supported-modes)
 - [Installation](#installation)
+- [Configuration](#configuration)
 - [Usage](#usage)
 - [Running TradeX as a Service](#running-tradex-as-a-service)
-- [Running TradeX in Docker](#running-tradex-in-docker)
+- [Running TradeX in Docker](#running-tradex-in-docker) recommended
 - [Using Nginx as a Proxy for Webhooks](#using-nginx-as-a-proxy-for-webhooks)
+- [Troubleshooting](#troubleshooting)
+- [Security Best Practices](#security-best-practices)
+- [Known Issues](#known-issues)
+- [License](#license)
+- [Support the Project](#support-the-project)
 
 ---
 
 ## Features
-
-- **Multi-Exchange Support**: Seamlessly works with Bybit and Binance, two of the biggest cryptocurrency exchanges.
+- **Multi-Exchange Support**: Seamlessly integrates with **Bybit and Binance Futures**.
 - **Order Management**: Cancel positions and orders directly from the dashboard.
-- **Pending and Open Positions**: View all your active and pending orders in a user-friendly interface.
+- **Real-Time Monitoring**: View all active and pending orders in a user-friendly interface.
 - **Close All Positions**: Quickly close all open positions with a single click.
-- **Authentication**: Secure dashboard with password.
-- **Trade PIN Protection**: Add an extra layer of security by requiring a PIN for order execution via webhooks.
+- **Signal Ingestion**: Supports both **webhook** and **email-based trade signals**.
+- **Authentication**: Secure dashboard with password protection.
+- **PIN Protection**: Add an extra layer of **security by requiring a PIN** for order execution via webhooks or emails.
+- **Logging**: Comprehensive logging for debugging and monitoring.
 
 ---
 
 ## Screenshots
-
 ![App_Screenshot](https://github.com/user-attachments/assets/79bd5123-c81c-49b1-9e8e-5d064698f20d)
 
 ---
 
 ## Supported Exchanges
-<img src="https://github.com/user-attachments/assets/ce33b5e5-0d4d-411e-9821-50e12414a7f2" alt="image" width="100px">   
-<img src="https://github.com/user-attachments/assets/ab0da857-493e-4824-ab3e-0d87fb05a0b0" alt="image" width="100px">
+- **Bybit Futures**
+- **Binance Futures** (not fully tested)
+- Additional exchanges can be added upon request or contributed via pull requests
+
+---
+Here’s the combined and enhanced version of your **Supported Modes** section, incorporating the additional context about TradingView's webhook reliability and how to configure alerts effectively:
+
+---
+
+## Supported Modes
+
+TradeX offers two distinct modes for receiving trade signals: **Webhook Mode** and **Email Mode**. These modes provide flexibility depending on your infrastructure, preferences, and technical setup. You can configure the mode using the `MODE` environment variable in the `.env` file (`MODE=webhook`, `MODE=email`, or `MODE=both`).
+
+---
+
+### 1. Webhook Mode
+**Webhook Mode** allows TradeX to listen for real-time trade signals sent via HTTP POST requests. This mode is ideal for users with stable internet connections, a public IP address, and access to domain hosting.
+
+#### Key Features:
+- **Real-Time Execution**: Signals are processed instantly as soon as they are received.
+- **Low Latency**: Minimal delay between signal generation (e.g., from TradingView) and order execution.
+- **Secure Authentication**: Requires a configurable PIN (`WEBHOOK_PIN`) to ensure only authorized signals are processed.
+- **Integration with TradingView**: Easily integrates with TradingView alerts using webhooks.
+
+#### Requirements:
+- A **public IP address** or domain name pointing to your server.
+- A **stable internet connection** to ensure uninterrupted communication.
+- Ports `80` or `443` must be open and accessible (or proxied via Nginx/Apache).
+- Optional: SSL/TLS certificate for secure HTTPS communication.
+
+#### Use Case:
+If you have a dedicated server or VPS with a public IP and want the fastest possible execution of trades, **Webhook Mode** is the best choice. It’s particularly suited for advanced traders who rely on real-time market data and fast execution.
+
+#### Important Note:
+It’s worth noting that **TradingView webhooks are not guaranteed to be delivered without delays or failures**. While TradingView provides webhook functionality for sending alerts, there are inherent limitations:
+- **Delivery Delays**: Webhooks may experience delays due to high volatility.
+- **Response Time Requirements**: TradingView expects a quick response (typically within milliseconds). If your application takes too long to respond, TradingView may retry the request or consider it failed.
+- **No Delivery Guarantees**: There are numerous reports online of missed or failed webhook deliveries.
+
+To mitigate these issues, consider using **Email Mode** as a fallback or running TradeX in **Dual Mode** (`MODE=both`) for redundancy.
+
+---
+
+### 2. Email Mode
+**Email Mode** allows TradeX to process trade signals sent via email. This mode is perfect for users who do not have a public IP, stable internet, or access to domain hosting. Instead of relying on HTTP requests, TradeX monitors an email inbox for unread emails containing trade signals.
+
+#### Key Features:
+- **No Public IP Required**: Works entirely through email, so there’s no need for port forwarding or domain hosting.
+- **Offline-Friendly**: Even if your internet connection drops temporarily, emails will be queued by the email provider and processed once the connection is restored.
+- **Simple Setup**: Just configure your email credentials (IMAP) and send trade signals via email.
+- **Flexible Signal Format**: Trade signals can be embedded in the email subject line as JSON.
+
+#### Requirements:
+- An email account with IMAP access enabled.
+- Properly formatted trade signals in the email subject line (JSON format).
+- No need for a public IP, domain, or open ports.
+
+#### Use Case:
+If you don’t have access to a public IP or stable internet, **Email Mode** is the ideal solution. It’s also a great fallback option for users who want redundancy in case their webhook setup fails.
+
+---
+
+### 3. Dual Mode (Both Webhook and Email)
+For maximum flexibility, TradeX supports running in **Dual Mode** (`MODE=both`). In this mode, TradeX listens for signals from both webhooks and emails simultaneously. This ensures you never miss a trade signal, regardless of your connectivity or infrastructure.
+
+#### Benefits:
+- **Versatility**: Combine the speed of webhooks with the reliability of email-based signals.
+- **Customizable Workflow**: Use webhooks for high-priority, real-time signals and emails for less time-sensitive trades.
+
+#### Example Use Case:
+A trader uses **TradingView webhooks** for real-time signals during active trading hours but switches to **email alerts** for overnight or low-priority trades. By enabling both modes, they ensure continuous operation without manual intervention.
+
+#### Important Note:
+When running in **Dual Mode**, it’s important to configure your TradingView alerts carefully to avoid duplicate signal processing:
+- **Tick "Send Email" Only**: Use this for signals that don't require instant execution but need guaranteed delivery.
+- **Tick "Webhook URL" Only**: Use this for signals that require fast execution.
+- **Avoid Ticking Both Boxes**: If both options are selected, the same signal will be sent twice—once via webhook and once via email. This could result in duplicate orders being placed.
+
+TradeX does not currently include a deduplication mechanism, so it’s up to the user to configure TradingView alerts appropriately. For example:
+- High-priority signals (e.g., scalping strategies) can be sent via webhook for fast execution.
+- Lower-priority signals (e.g., long-term position adjustments) can be sent via email for guaranteed delivery.
+
+---
+
+### How to Configure the Mode
+Set the `MODE` variable in your `.env` file to one of the following options:
+- `MODE=webhook`: Only listen for webhook signals.
+- `MODE=email`: Only process email signals.
+- `MODE=both`: Listen for both webhook and email signals simultaneously.
 
 
-- Bybit Futures
-- Binance Futures (not fully tested)
-- Additional changes can be made upon request, or you can contribute by submitting a pull request
+---
+
+### Additional Notes
+- **Security**: Both modes support PIN protection (`WEBHOOK_PIN`) to prevent unauthorized signal processing.
+- **Testing**: You can test both modes independently to ensure they work as expected before deploying in production.
+
+
 ---
 
 ## Installation
 
 ### Prerequisites
-
 - Python 3.8 or later
 - `pip` package manager
-- API keys for your supported exchanges (e.g., Bybit, Binance)
+- API keys for supported exchanges (e.g., Bybit, Binance)
+- Docker (optional, for containerized deployment)
 
 ### Steps
+1. **Clone the Repository**:
+   ```bash
+   git clone https://github.com/Sentello/tradex.git
+   cd tradex
+   ```
 
-1. Clone the repository:
-    ```bash
-    git clone https://github.com/Sentello/tradex.git
-    cd tradex
-    ```
+2. **Set Up a Virtual Environment** (optional but recommended):
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
 
-2. Set up a virtual environment:
-    ```bash
-    python3 -m venv venv
-    source venv/bin/activate
-    ```
+3. **Install Dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-3. Install the required packages:
-    ```bash
-    pip install -r requirements.txt
-    ```
+4. **Configure Environment Variables**:
+   - Rename `.env.example` to `.env` or create a new `.env` file.
+   - Add your exchange API keys, dashboard password, webhook PIN, and other required configurations.
 
-4. Configure your environment variables:
-    - Edit the config file `.env`.
-    - Add your exchange API keys, dashboard password, and PIN in `.env`.
+5. **Run the Application Locally**:
+   ```bash
+   python main.py
+   ```
 
-5. Run the application:
-    ```bash
-    python app.py
-    ```
+6. **Access the Dashboard**:
+   - Open your browser and go to `http://localhost:5000`.
 
-6. Access the dashboard:
-    - Open your browser and go to `http://localhost:5000`.
+---
+
+## Configuration
+
+The following environment variables must be configured in the `.env` file:
+
+| Variable               | Description                                                                 |
+|------------------------|-----------------------------------------------------------------------------|
+| `DASHBOARD_PASSWORD`   | Password for accessing the dashboard.                                      |
+| `WEBHOOK_PIN`          | PIN for securing webhook trade signals.                                    |
+| `BYBIT_API_KEY`        | API key for Bybit.                                                         |
+| `BYBIT_API_SECRET`      | API secret for Bybit.                                                      |
+| `BINANCE_API_KEY`       | API key for Binance.                                                       |
+| `BINANCE_API_SECRET`    | API secret for Binance.                                                    |
+| `MODE`                 | Signal ingestion mode: `"webhook"`, `"email"`, or `"both"`.                |
+| `IMAP_SERVER`          | IMAP server address (e.g., `imap.gmail.com`).                              |
+| `IMAP_PORT`            | IMAP server port (usually `993` for SSL).                                  |
+| `IMAP_EMAIL`           | Email address for receiving trade signals.                                |
+| `IMAP_PASSWORD`        | Password for the email account.                                           |
+
+
 
 ---
 
 ## Usage
 
-### Webhook Example (testing from curl)
-Webhook port is `5005`. To place an order via the webhook, use the following examples:
+### Webhook Example (Testing with `curl`)
+The webhook listener runs on port `5005`. Use the following examples to test placing orders via webhooks:
 
-Place a Market Order
-
+#### Place a Market Order
 ```bash
-curl -X POST http://<server-ip>:5005/webhook -H "Content-Type: application/json" -d '{
+curl -X POST http://localhost:5005/webhook \
+-H "Content-Type: application/json" \
+-d '{
     "PIN": "123456",
     "EXCHANGE": "bybit",
     "SYMBOL": "BTCUSDT",
@@ -100,33 +228,6 @@ curl -X POST http://<server-ip>:5005/webhook -H "Content-Type: application/json"
     "QUANTITY": 0.01
 }'
 ```
-Place a Limit Order
-
-```bash
-curl -X POST http://<server-ip>:5005/webhook -H "Content-Type: application/json" -d '{
-    "PIN": "123456",
-    "EXCHANGE": "binance",
-    "SYMBOL": "ETHUSDT",
-    "SIDE": "sell",
-    "ORDER_TYPE": "limit",
-    "QUANTITY": 0.5,
-    "PRICE": 2000.50
-}'
-```
-
-```bash
-curl -X POST http://<server-ip>:5005/webhook -H "Content-Type: application/json" -d '{
-    "PIN": "123456",
-    "EXCHANGE": "bybit",
-    "SYMBOL": "BTCUSDT",
-    "SIDE": "buy",
-    "ORDER_TYPE": "limit",
-    "QUANTITY": 0.05,
-    "PRICE": 91000
-}'
-```
-
-Place a Market Sell Order
 
 ```bash
 curl -X POST http://<server-ip>:5005/webhook -H "Content-Type: application/json" -d '{
@@ -139,8 +240,20 @@ curl -X POST http://<server-ip>:5005/webhook -H "Content-Type: application/json"
 }'
 ```
 
-Place a Limit Order with Stop Loss and Take Profit
-
+#### Place a Limit Order
+```bash
+curl -X POST http://localhost:5005/webhook \
+-H "Content-Type: application/json" \
+-d '{
+    "PIN": "123456",
+    "EXCHANGE": "binance",
+    "SYMBOL": "ETHUSDT",
+    "SIDE": "sell",
+    "ORDER_TYPE": "limit",
+    "QUANTITY": 0.5,
+    "PRICE": 2000.50
+}'
+```
 ```bash
 curl -X POST http://<server-ip>:5005/webhook -H "Content-Type: application/json" -d '{
     "PIN": "123456",
@@ -148,28 +261,14 @@ curl -X POST http://<server-ip>:5005/webhook -H "Content-Type: application/json"
     "SYMBOL": "BTCUSDT",
     "SIDE": "buy",
     "ORDER_TYPE": "limit",
-    "QUANTITY": 0.01,
-    "PRICE": 30000,
-    "STOP_LOSS": 29000,
-    "TAKE_PROFIT": 31000
+    "QUANTITY": 0.05,
+    "PRICE": 91000
 }'
 ```
 
-### Webhook Example (TradingView Webhook)
-The same logic applies as with cURL, but keep the content within the curly brackets as it is, so it looks like this:
-```bash
-{
-    "PIN": "123456",
-    "EXCHANGE": "bybit",
-    "SYMBOL": "BTCUSDT",
-    "SIDE": "buy",
-    "ORDER_TYPE": "market",
-    "QUANTITY": 0.01
-}
-```
-
-If you're using strategy, TradingView requires placeholders to be within quotes if the replacement value is not numeric. For example SIDE and QUANTITY, even though the value might be numeric in case of QUANTITY, the placeholder must be quoted to prevent JSON parsing errors when pasting into TradingView.
-```bash
+#### TradingView Webhook Integration
+When integrating with TradingView, ensure placeholders are properly quoted to avoid JSON parsing errors. Example:
+```json
 {
     "PIN": "123456",
     "EXCHANGE": "bybit",
@@ -180,237 +279,132 @@ If you're using strategy, TradingView requires placeholders to be within quotes 
 }
 ```
 
-**Please note that TradingView can only use webhooks on ports 80 or 443. This means you'll need to proxy your webhook port to either 80 or 443, depending on your requirements. I strongly recommend using port 80 to avoid potential SSL-related complications and suggest using Nginx as a proxy for this setup.**
+**Note**: TradingView requires webhooks to use ports `80` or `443`. Use Nginx as a reverse proxy to forward requests to port `5005`. I strongly recommend using port 80 to avoid potential SSL-related complications and suggest using Nginx as a proxy for this setup.
 
+---
 
 ## Running TradeX as a Service
 
-You can run the app as a service using two methods:
-
-1. **Supervisor** (`supervisorctl`)
-2. **systemd** (`systemctl`)
-
-Choose the one that best fits your needs.
+You can run TradeX as a service using either **Supervisor** or **systemd**.
+See the [HOWTO.md](HOWTO.md) file for details.
 
 ---
-
-### Option 1: Using Supervisor
-
-#### Steps:
-Install `supervisor` on your system:
-```bash
-sudo apt update
-sudo apt install supervisor
-```
-Create a configuration file for the dashboard_app:
-```bash
-sudo nano /etc/supervisor/conf.d/dashboard_app.conf:
-```
-Add the following content:
-```bash
-[program:dashboard_app]
-command=gunicorn -w 2 -b 0.0.0.0:5000 app:dashboard_app
-directory=/path/to/your/project
-autostart=true
-autorestart=true
-stderr_logfile=/var/logs/dashboard_error.log
-stdout_logfile=/var/logs/logs/dashboard_access.log
-```
-Create a configuration file for the webhook_app:
-```bash
-sudo nano /etc/supervisor/conf.d/webhook_app.conf:
-```
-Add the following content:
-```bash
-[program:webhook_app]
-command=gunicorn -w 2 -b 0.0.0.0:5005 app:webhook_app
-directory=/path/to/your/project
-autostart=true
-autorestart=true
-stderr_logfile=/var/logs/webhook_error.log
-stdout_logfile=/var/logs/webhook_access.log
-```
-... and replace /path/to/ with the directory where your app is located. 
-Apply the Configuration, reload Supervisor and start the service:
- ```bash
-sudo supervisorctl reread
-sudo supervisorctl update
-sudo supervisorctl start all
-```
-Check the status of your app:
- ```bash
-sudo supervisorctl status
-```
-To stop or restart the app:
- ```bash
-sudo supervisorctl stop dashboard_app
-sudo supervisorctl restart dashboard_app
-sudo supervisorctl stop webhook_app
-sudo supervisorctl restart webhook_app
-```
-- Standard Output: /var/log/xxx
-- Errors: /var/log/xxx
-
-### Option 2: Using systemd
-
-#### Steps:
-Navigate to the /etc/systemd/system/ directory:
- ```bash
-cd /etc/systemd/system/
-```
-Create a new file for dashboard_app:
- ```bash
-nano dashboard_app.service
-```
-Add the following content:
- ```bash
-[Unit]
-Description=Gunicorn instance to serve dashboard_app
-After=network.target
-
-[Service]
-User=root
-Group=root
-WorkingDirectory=/path/to/your/project
-ExecStart=/path/to/your/virtualenv/bin/gunicorn -w 4 -b 0.0.0.0:5000 app:dashboard_app
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-```
-/path/to/your/project with the directory containing your app.py.
-/path/to/your/virtualenv/bin/gunicorn with the Gunicorn binary in your virtual environment.
-Create another service file for webhook_app:
- ```bash
-nano webhook_app.service
-```
-Add the following configuration:
- ```bash
-[Unit]
-Description=Gunicorn instance to serve webhook_app
-After=network.target
-
-[Service]
-User=root
-Group=root
-WorkingDirectory=/path/to/your/project
-ExecStart=/path/to/your/virtualenv/bin/gunicorn -w 2 -b 0.0.0.0:5005 app:webhook_app
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-
-```
-Reload systemd to recognize the new service:
- ```bash
-sudo systemctl daemon-reload
-```
-Start the services:
- ```bash
-systemctl start dashboard_app
-systemctl start webhook_app
-```
-Enable the services to start automatically on boot:
- ```bash
-systemctl enable dashboard_app
-systemctl enable webhook_app
-```
-Check the service status:
- ```bash
-systemctl status dashboard_app
-systemctl status webhook_app
-```
-View logs using journalctl:
- ```bash
-journalctl -u dashboard_app
-journalctl -u webhook_app
-```
-To stop or restart service:
- ```bash
-systemctl restart dashboard_app
-systemctl restart webhook_app
-
-systemctl stop dashboard_app
-systemctl stop webhook_app
-```
 
 ## Running TradeX in Docker
-Before you begin, ensure you have the following installed on your system:
-- [Git](https://git-scm.com/)
-- [Docker](https://www.docker.com/)
-- [Docker Compose](https://docs.docker.com/compose/)
+
+1. Build and start the application:
+   ```bash
+   docker-compose build --no-cache
+   docker-compose up --build -d
+   ```
+
+   or use `build_and_run.sh`.
+
+2. Check the status of the containers:
+   ```bash
+   docker ps | grep tradex
+   ```
+
+3. View logs:
+   ```bash
+   docker-compose logs -f
+   ```
+
+4. Stop the application:
+   ```bash
+   docker-compose down
+   ```
 
 ---
-#### Steps:
-Clone the `tradex` repository from GitHub to your local machine:
-```bash
-git clone https://github.com/Sentello/tradex.git
-```
-Then you need to customize environment variables, `.env` and  take a look at the `docker-compose.yml`
 
-Build and start the application
- ```bash
-cd tradex
-docker-compose build --no-cache
-docker-compose up --build -d
-```
-Ensure the application container is running:
- ```bash
-docker ps | grep tradex
-```
-To stop the application, use:
- ```bash
-docker-compose down
-```
-For logs and debugging, run:
- ```bash
-docker-compose logs -f
-```
-Update the application by pulling the latest changes and rebuilding:
- ```bash
-git pull origin main
-docker-compose up --build -d
-```
 ## Using Nginx as a Proxy for Webhooks
 
-If you decide not to change the webhook port from `5005` to port `80` or `443`, you can use Nginx as a reverse proxy. This will allow external services (like TradingView) to access your webhook while maintaining the original application port.
+You need to expose the webhook listener on port `80` or `443`, use Nginx as a reverse proxy:
 
-### Steps to Set Up Nginx as a Proxy
-
-1. **Install Nginx**:
-   First, install Nginx on your server:
+1. Install Nginx:
    ```bash
    sudo apt update
    sudo apt install nginx
    ```
-2. **Create a New Nginx Configuration**:
+
+2. Create a new configuration file:
    ```bash
    sudo nano /etc/nginx/sites-available/tradex-webhook
    ```
-    Add the following content:
-    ```bash
-    server {
-        listen 80;
-        server_name your.domain.com; # Replace with your domain or server IP
-    
-        location /webhook {
-            proxy_pass http://127.0.0.1:5005; # Proxy to your local webhook
-            proxy_http_version 1.1;
-            proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection 'upgrade';
-            proxy_set_header Host $host;
-            proxy_cache_bypass $http_upgrade;
-        }
-    }
-     ```
-3. **Enable the New Configuration**:
-   ```bash
-       sudo ln -s /etc/nginx/sites-available/tradex-webhook /etc/nginx/sites-enabled/
-       sudo nginx -t
-       sudo systemctl restart nginx
+
+3. Add the following content:
+   ```nginx
+   server {
+       listen 80;
+       server_name your.domain.com;
+
+       location /webhook {
+           proxy_pass http://127.0.0.1:5005;
+           proxy_http_version 1.1;
+           proxy_set_header Upgrade $http_upgrade;
+           proxy_set_header Connection 'upgrade';
+           proxy_set_header Host $host;
+           proxy_cache_bypass $http_upgrade;
+       }
+   }
    ```
-4. **Update Your Webhook URL**:
-   When sending webhooks (from TradingView), use the new URL pointing to your domain or server IP on port 80: `http://your.domain.com/webhook`
+
+4. Enable the configuration and restart Nginx:
+   ```bash
+   sudo ln -s /etc/nginx/sites-available/tradex-webhook /etc/nginx/sites-enabled/
+   sudo nginx -t
+   sudo systemctl restart nginx
+   ```
+
+5. Update Your Webhook URL: 
+When sending webhooks (from TradingView), use the URL pointing to your domain or server IP on port 80: `http://your.domain.com/webhook`
+
+---
+
+## Troubleshooting
+
+- **Error: "No exchanges loaded!"**: Ensure your API keys are correctly configured in `.env`.
+- **Webhook Errors**: Verify the `WEBHOOK_PIN` matches the one in your `.env` file.
+- **Email Reader Issues**: Check IMAP credentials and ensure the email account allows IMAP access.
+- **Dashboard Not Accessible**: Ensure the Flask app is running and the correct port (`5000`) is exposed.
+
+For further assistance, check the logs in the `logs/` directory.
+
+---
+
+## Security Best Practices
+
+- **Restrict Access**: Limit access to the dashboard by binding it to `127.0.0.1` or using a firewall.
+- **Regularly Rotate API Keys**: Periodically update your exchange API keys to minimize risks.
+
+---
+
+## Known Issues
+
+- **Binance Futures**: Support for Binance Futures is not fully tested.
+- **Email Parsing**: The email reader assumes trade signals are always in the subject line. This may fail if the format changes in the future.
+- **Rate Limits**: High-frequency trading may trigger rate limits on exchanges.
+
+---
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+---
+
+## 🙏 Support the Project
+If you find this project useful and would like to support me, consider making a donation.
+
+### Scan to Donate
+
+#### Bitcoin (BTC)
+![Bitcoin QR Code](path/to/bitcoin_qr_code.png)
+
+#### Ethereum (ETH)
+![Ethereum QR Code](path/to/ethereum_qr_code.png)
+
+Thank You!
 
 ---
 <img src="https://media1.tenor.com/m/ofDuH0hvGh8AAAAd/so-what-do-you-think.gif" width="200" title="Ray Romano saying What do you think?" alt="Ray Romano saying What do you think?"/>
