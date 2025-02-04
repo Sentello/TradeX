@@ -2,7 +2,7 @@
 
 **TradeX** is an advanced, web-based trading bot designed to automate cryptocurrency trading across major exchanges like **Binance** and **Bybit**. It integrates seamlessly with **TradingView webhooks** and **email alerts**, enabling real-time trade execution based on custom signals. The system provides a secure and user-friendly dashboard for managing open positions, pending orders, and executing trades.
 
-Key features include:
+**Key features include:**
 - Multi-exchange support (Bybit, Binance).
 - Secure authentication and PIN protection for trade execution.
 - Real-time monitoring of open positions and pending orders.
