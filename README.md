@@ -48,6 +48,10 @@ Key features include:
 ---
 
 ## Supported Exchanges
+
+<img src="https://github.com/user-attachments/assets/ce33b5e5-0d4d-411e-9821-50e12414a7f2" alt="image" width="100px">   
+<img src="https://github.com/user-attachments/assets/ab0da857-493e-4824-ab3e-0d87fb05a0b0" alt="image" width="100px">
+
 - **Bybit Futures**
 - **Binance Futures** (not fully tested)
 - Additional exchanges can be added upon request or contributed via pull requests
