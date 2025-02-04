@@ -57,9 +57,6 @@
 - Additional exchanges can be added upon request or contributed via pull requests
 
 ---
-Here’s the combined and enhanced version of your **Supported Modes** section, incorporating the additional context about TradingView's webhook reliability and how to configure alerts effectively:
-
----
 
 ## Supported Modes
 
