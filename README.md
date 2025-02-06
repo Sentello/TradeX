@@ -403,9 +403,14 @@ If you find this project useful and would like to support me, consider making a 
 
 #### Bitcoin (BTC SegWit)
 `bc1qm4zv6fwxuf8n5sdkrfc6ylxyhs6vhmkkvxcjf0`
+![image](https://github.com/user-attachments/assets/5476d500-b71a-4d4d-b688-6dcc35b2a858)
+
 
 #### Ethereum (ETH ERC20)
 `0xaa0ab64b0cdecb527eb5e7d5fc9ed94044c37a4c`
+![image](https://github.com/user-attachments/assets/21981a90-50f2-46ef-aa29-7c68c9d1742b)
+
+
 
 Thank You!
 
