@@ -401,11 +401,11 @@ If you find this project useful and would like to support me, consider making a 
 
 ### Scan to Donate
 
-#### Bitcoin (BTC)
-![Bitcoin QR Code](path/to/bitcoin_qr_code.png)
+#### Bitcoin (BTC SegWit)
+`bc1qm4zv6fwxuf8n5sdkrfc6ylxyhs6vhmkkvxcjf0`
 
-#### Ethereum (ETH)
-![Ethereum QR Code](path/to/ethereum_qr_code.png)
+#### Ethereum (ETH ERC20)
+`0xaa0ab64b0cdecb527eb5e7d5fc9ed94044c37a4c`
 
 Thank You!
 
