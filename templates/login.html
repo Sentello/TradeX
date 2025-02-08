@@ -6,66 +6,83 @@
     <title>Login</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Arial', sans-serif;
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
             margin: 0;
-            background-color: #f4f4f9;
+            background-color: #1a1a1a;
         }
         .login-container {
-            background: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-            width: 300px;
+            background: #2d2d2d;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            width: 320px;
+            border: 1px solid #3d3d3d;
         }
         h1 {
             text-align: center;
-            color: #4CAF50;
-            margin-bottom: 20px;
+            color: #2ecc71;
+            margin-bottom: 25px;
+            font-size: 1.8em;
         }
         .input-group {
             position: relative;
+            margin: 15px 0;
         }
         input[type="password"], input[type="text"] {
             width: 100%;
-            height: 40px;
-            padding: 0 10px;
-            margin: 10px 0;
-            border: 2px solid #ddd;
-            border-radius: 4px;
+            height: 45px;
+            padding: 0 40px 0 15px;
+            background: #3d3d3d;
+            border: 2px solid #4d4d4d;
+            border-radius: 6px;
+            color: #ffffff;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
             box-sizing: border-box;
+        }
+        input:focus {
+            outline: none;
+            border-color: #2ecc71;
         }
         .toggle-password {
             position: absolute;
             top: 50%;
-            right: 10px;
+            right: 15px;
             transform: translateY(-50%);
             cursor: pointer;
-            color: #888;
+            color: #95a5a6;
+            font-size: 18px;
             user-select: none;
-        }
-        input[type="password"].error-input, input[type="text"].error-input {
-            border-color: red;
+            z-index: 2;
         }
         button {
             width: 100%;
-            padding: 10px;
-            background-color: #4CAF50;
+            padding: 12px;
+            background-color: #2ecc71;
             color: white;
             border: none;
-            border-radius: 4px;
+            border-radius: 6px;
             cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
         }
         button:hover {
-            background-color: #45a049;
+            background-color: #27ae60;
+            transform: translateY(-1px);
         }
         .error {
-            color: red;
+            color: #ff4444;
             text-align: center;
-            margin-top: 10px;
+            margin-top: 15px;
+            font-size: 0.9em;
+        }
+        ::placeholder {
+            color: #7f8c8d;
+            opacity: 1;
         }
     </style>
 </head>

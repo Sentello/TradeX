@@ -3,33 +3,37 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Trading Bot Dashboard</title>
+  <title>TradeX Bot Dashboard</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      background-color: #f4f4f9;
+      font-family: 'Arial', sans-serif;
+      background-color: #1a1a1a;
+      color: #ffffff;
       margin: 0;
       padding: 0;
     }
 
     h1 {
       text-align: center;
-      color: #4CAF50;
+      color: #2ecc71;
       margin: 20px 0;
+      font-size: 2.5em;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     }
 
     h2 {
       text-align: center;
-      color: #555;
+      color: #95a5a6;
+      margin: 15px 0;
     }
 
     .container {
       max-width: 1200px;
       margin: 20px auto;
-      background: #fff;
-      border-radius: 8px;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-      overflow: hidden;
+      background: #2d2d2d;
+      border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      border: 1px solid #3d3d3d;
     }
 
     table {
@@ -41,57 +45,71 @@
     th, td {
       padding: 12px;
       text-align: center;
-      border-bottom: 1px solid #ddd;
+      border-bottom: 1px solid #3d3d3d;
     }
 
     th {
-      background-color: #4CAF50;
-      color: white;
+      background-color: #3d3d3d;
+      color: #2ecc71;
+      font-weight: bold;
+      border-bottom: 2px solid #2ecc71;
     }
 
     tr:hover {
-      background-color: #f1f1f1;
+      background-color: #3d3d3d;
     }
 
     button {
-      padding: 10px 20px;
+      padding: 8px 18px;
       border: none;
       border-radius: 5px;
       cursor: pointer;
       font-weight: bold;
-      font-size: 14px;
-      transition: 0.3s;
+      transition: all 0.3s ease;
     }
 
     .close-btn {
-      background-color: #ff5252;
+      background-color: #e74c3c;
       color: white;
     }
 
     .close-btn:hover {
-      background-color: #ff1744;
+      background-color: #c0392b;
+      transform: translateY(-1px);
     }
 
     .close-all-btn {
-      background-color: #ff9800;
+      background-color: #f39c12;
       color: white;
       margin: 20px;
       display: block;
       width: fit-content;
       margin-left: auto;
       margin-right: auto;
+      padding: 12px 25px;
     }
 
     .close-all-btn:hover {
-      background-color: #ff7043;
+      background-color: #e67e22;
+      transform: scale(1.05);
     }
 
     footer {
       text-align: center;
+      padding: 15px;
+      margin-top: 30px;
+      background-color: #3d3d3d;
+      color: #95a5a6;
+      font-size: 0.9em;
+    }
+
+    /* Error message styling */
+    [style*="color: red"] {
+      color: #ff4444 !important;
+      background: rgba(255, 68, 68, 0.1);
       padding: 10px;
-      margin-top: 20px;
-      background-color: #4CAF50;
-      color: white;
+      border-radius: 5px;
+      border: 1px solid #ff4444;
     }
   </style>
   <script>
@@ -185,7 +203,7 @@
       }
     }
 
-    // Auto-fetch positions and pending orders every 5 seconds
+    // Auto-fetch positions and pending orders every 5 sec.
     setInterval(() => {
       fetchPositions();
       fetchPendingOrders();
@@ -199,7 +217,7 @@
   </script>
 </head>
 <body>
-  <h1>💰 Trading Bot Dashboard</h1>
+  <h1>💰 TradeX Bot Dashboard</h1>
 
   <!-- Show an error if passed in the template context -->
   {% if error %}
@@ -255,7 +273,7 @@
   </form>
 
   <footer>
-    &copy; Trading Bot Dashboard
+    &copy; TradeX Bot Dashboard
   </footer>
 </body>
 </html>
