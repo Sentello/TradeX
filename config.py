@@ -28,7 +28,7 @@ BINANCE_API_SECRET = os.getenv("BINANCE_API_SECRET", "")
 # Which exchanges to enable (comma-separated list, e.g. "bybit,binance")
 EXCHANGES = os.getenv("EXCHANGES", "bybit,binance").lower()
 
-# Mode for signal ingestion
+# Default mode for signal ingestion is webhook
 MODE = os.getenv("MODE", "webhook").lower()  # "webhook", "email", or "both"
 
 # Email (IMAP)
