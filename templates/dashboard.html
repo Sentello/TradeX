@@ -182,7 +182,7 @@
                 <td>${order.symbol}</td>
                 <td>${order.type}</td>
                 <td>${order.side}</td>
-                <td>${order.price}</td>
+                <td>${order.price !== null ? order.price : (order.triggerPrice || 'N/A')}</td>
                 <td>${order.amount || order.info.qty || 'N/A'}</td>
                 <td>${exchange}</td>
                 <td>
