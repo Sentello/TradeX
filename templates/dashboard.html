@@ -214,17 +214,33 @@
       }
     }
 
-    // Auto-fetch positions and pending orders every 5 sec.
-    setInterval(() => {
-      fetchPositions();
-      fetchPendingOrders();
-    }, 5000);
 
     // Initial load
     window.onload = () => {
       fetchPositions();
       fetchPendingOrders();
+      fetchSummaryStats(); // Fetch summary stats on initial load
     };
+
+    async function fetchSummaryStats() {
+      try {
+        const response = await fetch('/summary_stats');
+        const summaryData = await response.json();
+
+        document.querySelector('#portfolio-value').textContent = `$${summaryData.portfolio_value.toFixed(2)}`;
+        document.querySelector('#total-pnl').textContent = `$${summaryData.total_pnl.toFixed(2)}`;
+        document.querySelector('#margin-used').textContent = `$${summaryData.margin_used.toFixed(2)}`;
+
+      } catch (error) {
+        console.error('Error fetching summary stats:', error);
+      }
+    }
+
+    setInterval(() => {
+      fetchPositions();
+      fetchPendingOrders();
+      fetchSummaryStats(); // Fetch summary stats every 15 seconds
+    }, 15000);
   </script>
 </head>
 <body>
@@ -236,6 +252,21 @@
       <strong>Error:</strong> {{ error }}
     </div>
   {% endif %}
+
+  <div class="container" id="summary-stats">
+    <h2>Summary Statistics</h2>
+    <div style="display: flex; justify-content: space-around; padding: 15px;">
+      <div>
+        <strong>Portfolio Value:</strong> <span id="portfolio-value">Loading...</span>
+      </div>
+      <div>
+        <strong>Total PNL:</strong> <span id="total-pnl">Loading...</span>
+      </div>
+      <div>
+        <strong>Margin Used:</strong> <span id="margin-used">Loading...</span>
+      </div>
+    </div>
+  </div>
 
   <div class="container">
     <h2>Open Positions</h2>

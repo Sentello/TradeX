@@ -201,3 +201,36 @@ def cancel_order(exchange_name, order_id, symbol):
     except Exception as e:
         logger.error(f"❌ Error cancelling order {order_id}: {e}")
         return {"status": "error", "message": str(e)}
+
+
+def calculate_summary_stats():
+    """Calculates and returns summary statistics for the dashboard."""
+    logger.info("📊 Calculating summary statistics...")
+    summary_stats = {
+        "portfolio_value": 0.0,
+        "total_pnl": 0.0,
+        "margin_used": 0.0,
+    }
+
+    if not exchanges:
+        logger.error("❌ No exchanges loaded! Cannot calculate summary stats.")
+        return summary_stats
+
+    for exchange_name, exchange in exchanges.items():
+        try:
+            account_balance = exchange.fetch_balance()
+            positions = get_positions().get(exchange_name, [])
+
+            # Calculate portfolio value (assuming USDT as base currency)
+            summary_stats["portfolio_value"] += account_balance.get('USDT', {}).get('total', 0.0)
+
+            # Calculate total PNL and margin used from positions
+            for pos in positions:
+                summary_stats["total_pnl"] += pos.get('unrealized_pnl', 0.0)
+                summary_stats["margin_used"] += pos.get('notional', 0.0) * pos.get('margin_ratio', 0.0) if pos.get('margin_ratio') else 0.0
+
+        except Exception as e:
+            logger.error(f"❌ Error fetching account balance or positions for {exchange_name}: {e}")
+
+    logger.info(f"📊 Summary statistics calculated: {summary_stats}")
+    return summary_stats
