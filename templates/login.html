@@ -51,13 +51,28 @@
         .toggle-password {
             position: absolute;
             top: 50%;
-            right: 15px;
+            right: 10px;
             transform: translateY(-50%);
             cursor: pointer;
-            color: #95a5a6;
-            font-size: 18px;
-            user-select: none;
+            background: none;
+            border: none;
+            padding: 0;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             z-index: 2;
+        }
+        .toggle-password:focus {
+            outline: 2px solid #2ecc71;
+            outline-offset: 2px;
+        }
+        .toggle-password svg {
+            width: 18px;
+            height: 18px;
+            stroke: #95a5a6;
+            transition: stroke 0.3s ease;
         }
         button {
             width: 100%;
@@ -74,6 +89,17 @@
             background-color: #27ae60;
             transform: translateY(-1px);
         }
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
         .error {
             color: #ff4444;
             text-align: center;
@@ -81,7 +107,7 @@
             font-size: 0.9em;
         }
         ::placeholder {
-            color: #7f8c8d;
+            color: #bdc3c7;
             opacity: 1;
         }
     </style>
@@ -89,27 +115,35 @@
 <body>
     <div class="login-container">
         <h1>Login</h1>
-        <form method="POST">
+        <form method="POST" action="/login">
             <div class="input-group">
-                <input type="password" name="password" placeholder="Enter Password" required>
-                <span class="toggle-password">👁️</span>
+                <input type="password" name="password" id="password" placeholder="Enter Password" required aria-describedby="toggle-description">
+                <button type="button" class="toggle-password" aria-label="Show password" aria-pressed="false">
+                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                </button>
+                <span id="toggle-description" class="sr-only">Toggle password visibility</span>
             </div>
             <button type="submit">Login</button>
             {% if error %}
-            <p class="error">{{ error }}</p>
+            <p class="error" role="alert">{{ error }}</p>
             {% endif %}
         </form>
     </div>
     <script>
         document.querySelectorAll('.toggle-password').forEach(icon => {
             icon.addEventListener('click', function () {
-                const passwordField = this.previousElementSibling;
+                const passwordField = document.getElementById('password');
                 if (passwordField.type === 'password') {
                     passwordField.type = 'text';
-                    this.textContent = '🙈';
+                    this.querySelector('svg').style.stroke = '#2ecc71';
+                    this.setAttribute('aria-pressed', 'true');
                 } else {
                     passwordField.type = 'password';
-                    this.textContent = '👁️';
+                    this.querySelector('svg').style.stroke = '#95a5a6';
+                    this.setAttribute('aria-pressed', 'false');
                 }
             });
         });
