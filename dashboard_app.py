@@ -6,6 +6,7 @@ import os
 
 import config
 from bot_logic import (
+    calculate_summary_stats, # Import the new function
     execute_order,
     get_positions,
     get_pending_orders,
@@ -117,6 +118,18 @@ def pending_orders():
         return jsonify(orders)
     except Exception as e:
         logger.error(f"Error fetching pending orders: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+# Fetch Summary Stats (API)
+@app.route("/summary_stats", methods=["GET"])
+@login_required
+def summary_stats():
+    try:
+        stats = calculate_summary_stats() # Placeholder function in bot_logic.py
+        logger.info(f"Fetched summary stats: {stats}")
+        return jsonify(stats)
+    except Exception as e:
+        logger.error(f"Error fetching summary stats: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # Close a Specific Position
