@@ -83,6 +83,8 @@ def get_positions():
                         "notional": pos.get('notional', 0.0),
                         "entry_price": pos.get('entryPrice', 0.0),
                         "liquidation_price": pos.get('liquidationPrice', None),
+                        "margin_ratio": pos.get('marginRatio', None),
+                        "leverage": pos.get('leverage', None),
                         "unrealized_pnl": pos.get('unrealizedPnl', 0.0),
                         "exchange": exchange_name
                     })

@@ -154,6 +154,8 @@
                 <td>${notional.toFixed(2)}</td>
                 <td>${entryPrice.toFixed(4)}</td>
                 <td>${liqPrice === null ? 'N/A' : liqPrice}</td>
+                <td>${position.margin_ratio ? position.margin_ratio.toFixed(2) : 'N/A'}</td>
+                <td>${position.leverage || 'N/A'}</td>
                 <td class="${unrealPnl >= 0 ? 'pnl-positive' : 'pnl-negative'}">${unrealPnl.toFixed(2)}</td>
                 <td>${exchangeName}</td>
                 <td>
@@ -246,6 +248,8 @@
           <th>Notional</th>
           <th>Entry Price</th>
           <th>Liquidation Price</th>
+          <th>Margin Ratio</th>
+          <th>Leverage</th>
           <th>Unrealized PNL</th>
           <th>Exchange</th>
           <th>Close</th>
