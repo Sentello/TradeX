@@ -111,6 +111,15 @@
       border-radius: 5px;
       border: 1px solid #ff4444;
     }
+    .pnl-positive {
+      color: #28a745;
+      font-weight: bold;
+    }
+
+    .pnl-negative {
+      color: #dc3545;
+      font-weight: bold;
+    }
   </style>
   <script>
     // Fetch and display positions
@@ -145,7 +154,7 @@
                 <td>${notional.toFixed(2)}</td>
                 <td>${entryPrice.toFixed(4)}</td>
                 <td>${liqPrice === null ? 'N/A' : liqPrice}</td>
-                <td>${unrealPnl.toFixed(2)}</td>
+                <td class="${unrealPnl >= 0 ? 'pnl-positive' : 'pnl-negative'}">${unrealPnl.toFixed(2)}</td>
                 <td>${exchangeName}</td>
                 <td>
                   <form method="POST" action="/close_position" onsubmit="return confirm('Close position for ${symbol}?')">
