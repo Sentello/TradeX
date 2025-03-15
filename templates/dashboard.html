@@ -170,7 +170,7 @@
           });
         }
       } catch (error) {
-        console.error('Error fetching positions:', error);
+        console.error('Error fetching positions:', error.message);
       }
     }
 
@@ -209,7 +209,7 @@
           });
         }
       } catch (error) {
-        console.error('Error fetching pending orders:', error);
+        console.error('Error fetching pending orders:', error.message);
       }
     }
 
@@ -223,7 +223,11 @@
         document.querySelector('#portfolio-value').textContent = `$${summaryData.portfolio_value.toFixed(2)}`;
         document.querySelector('#total-pnl').textContent = `$${summaryData.total_pnl.toFixed(2)}`;
         document.querySelector('#margin-used').textContent = `$${summaryData.margin_used.toFixed(2)}`;
-        15 sec
+      } catch (error) {
+        console.error('Error fetching summary stats:', error);
+      }
+    }
+
     // Fetch and display logs
     async function fetchLogs() {
       try {
@@ -262,19 +266,24 @@
           logsTextArea.value = 'Error fetching logs: ' + logsData.message;
         }
       } catch (error) {
-        console.error('Error fetching logs:', error);
+        console.error('Error fetching logs:', error.message);
         document.getElementById('logs-textarea').value = 'Error fetching logs: ' + error.message;
       }
     }
 
     function displayLogs(selectedLogFile, allLogs) {
-      const logsTextArea = document.getElementById('logs-textarea');
+      try {
+        const logsTextArea = document.getElementById('logs-textarea');
+
       if (selectedLogFile && allLogs[selectedLogFile]) {
         logsTextArea.value = allLogs[selectedLogFile].join('');
       } else {
         logsTextArea.value = 'Select a log file to view.';
       }
+    } catch (error) {
+      console.error('Error displaying logs:', error.message);
     }
+  }
 
     // Initial load
     window.onload = () => {

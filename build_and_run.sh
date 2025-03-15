@@ -1,5 +1,4 @@
 #!/bin/bash
-set -e
 
 CONTAINER_NAME="tradex_container"
 DOCKER_COMPOSE_FILE="docker-compose.yml"
@@ -8,13 +7,6 @@ log_message() {
     local MESSAGE="$1"
     echo "$(date '+%Y-%m-%d %H:%M:%S') [INFO] $MESSAGE"
 }
-
-error_handler() {
-    log_message "❌ An error occurred. Exiting..."
-    exit 1
-}
-
-trap error_handler ERR
 
 log_message "🚀 Stopping and removing old container..."
 docker-compose -f "$DOCKER_COMPOSE_FILE" down --remove-orphans || true
