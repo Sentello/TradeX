@@ -3,10 +3,11 @@ from logging.handlers import RotatingFileHandler
 from flask import Flask, request, jsonify, render_template, redirect, url_for, session
 from datetime import timedelta
 import os
+import bcrypt
 
 import config
 from bot_logic import (
-    calculate_summary_stats, # Import the new function
+    calculate_summary_stats,
     execute_order,
     get_positions,
     get_pending_orders,
@@ -65,7 +66,9 @@ def login_required(func):
 def login():
     if request.method == "POST":
         password = request.form.get("password")
-        if password == config.DASHBOARD_PASSWORD:
+        # Hash the password from config.py (This should be done securely)
+        hashed_password = config.DASHBOARD_PASSWORD.encode('utf-8') # Assuming the password in config is already hashed
+        if bcrypt.checkpw(password.encode('utf-8'), hashed_password):
             session["logged_in"] = True
             session["user_authenticated"] = True
             session.permanent = True
@@ -175,6 +178,25 @@ def cancel_order_route():
         logger.error(f"Error canceling order: {e}")
         return redirect(url_for("index"))
 
-# Run Flask if executed directly
+# Fetch Logs (API)
+@app.route("/logs", methods=["GET"])
+@login_required
+def logs():
+    try:
+        log_files = [f for f in os.listdir(log_directory) if f.endswith(".log")]
+        all_logs = {}
+        for log_file in log_files:
+            log_file_path = os.path.join(log_directory, log_file)
+            try:
+                with open(log_file_path, "r") as f:
+                    all_logs[log_file] = f.readlines()
+            except Exception as e:
+                all_logs[log_file] = [f"Error reading log file: {e}"]
+        return jsonify({"status": "success", "logs": all_logs})
+    except Exception as e:
+        logger.error(f"Error fetching logs: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+# Run Flask if executed directly (python main.py)
 if __name__ == "__main__":
     app.run(host=config.DASHBOARD_HOST, port=config.DASHBOARD_PORT)

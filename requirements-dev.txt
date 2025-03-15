@@ -31,6 +31,7 @@ marshmallow==3.26.1
 mdurl==0.1.2
 multidict==6.1.0
 packaging==24.2
+pipdeptree==2.25.0
 propcache==0.2.1
 psutil==6.1.1
 pycares==4.5.0
@@ -42,9 +43,13 @@ python-dotenv==1.0.1
 python-Levenshtein==0.26.1
 RapidFuzz==3.12.1
 requests==2.32.3
+rich==13.9.4
 ruamel.yaml==0.18.10
+safety==3.3.0
 safety-schemas==0.0.10
 setuptools==75.8.0
+shellingham==1.5.4
+typer==0.15.1
 typing_extensions==4.12.2
 urllib3==2.3.0
 Werkzeug==3.1.3

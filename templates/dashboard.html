@@ -103,7 +103,6 @@
       font-size: 0.9em;
     }
 
-    /* Error message styling */
     [style*="color: red"] {
       color: #ff4444 !important;
       background: rgba(255, 68, 68, 0.1);
@@ -215,13 +214,7 @@
     }
 
 
-    // Initial load
-    window.onload = () => {
-      fetchPositions();
-      fetchPendingOrders();
-      fetchSummaryStats(); // Fetch summary stats on initial load
-    };
-
+    // Fetch and display summary stats
     async function fetchSummaryStats() {
       try {
         const response = await fetch('/summary_stats');
@@ -230,11 +223,66 @@
         document.querySelector('#portfolio-value').textContent = `$${summaryData.portfolio_value.toFixed(2)}`;
         document.querySelector('#total-pnl').textContent = `$${summaryData.total_pnl.toFixed(2)}`;
         document.querySelector('#margin-used').textContent = `$${summaryData.margin_used.toFixed(2)}`;
+        15 sec
+    // Fetch and display logs
+    async function fetchLogs() {
+      try {
+        const response = await fetch('/logs');
+        const logsData = await response.json();
+        const logsTextArea = document.getElementById('logs-textarea');
+        const logFileSelect = document.getElementById('log-file-select');
 
+        if (logsData.status === 'success') {
+          // Clear the select options
+          logFileSelect.innerHTML = '';
+          // Add a default option
+          let defaultOption = document.createElement('option');
+          defaultOption.value = '';
+          defaultOption.textContent = 'Select a log file';
+          logFileSelect.appendChild(defaultOption);
+
+          // Populate the select options
+          for (const logFile in logsData.logs) {
+            const option = document.createElement('option');
+            option.value = logFile;
+            option.textContent = logFile;
+            logFileSelect.appendChild(option);
+          }
+
+          // Set the default log file to display
+          logFileSelect.value = Object.keys(logsData.logs)[0] || ''; // Select the first log file (if available)
+          displayLogs(logFileSelect.value, logsData.logs);
+
+          // Add event listener to the select box
+          logFileSelect.addEventListener('change', () => {
+            displayLogs(logFileSelect.value, logsData.logs);
+          });
+
+        } else {
+          logsTextArea.value = 'Error fetching logs: ' + logsData.message;
+        }
       } catch (error) {
-        console.error('Error fetching summary stats:', error);
+        console.error('Error fetching logs:', error);
+        document.getElementById('logs-textarea').value = 'Error fetching logs: ' + error.message;
       }
     }
+
+    function displayLogs(selectedLogFile, allLogs) {
+      const logsTextArea = document.getElementById('logs-textarea');
+      if (selectedLogFile && allLogs[selectedLogFile]) {
+        logsTextArea.value = allLogs[selectedLogFile].join('');
+      } else {
+        logsTextArea.value = 'Select a log file to view.';
+      }
+    }
+
+    // Initial load
+    window.onload = () => {
+      fetchPositions();
+      fetchPendingOrders();
+      fetchSummaryStats();
+      fetchLogs();
+    };
 
     setInterval(() => {
       fetchPositions();
@@ -312,12 +360,20 @@
     </table>
   </div>
 
+  <div class="container">
+    <h2>Logs</h2>
+    <select id="log-file-select">
+      <!-- Options will be populated by JavaScript -->
+    </select>
+    <textarea id="logs-textarea" rows="10" cols="100" readonly style="width: 98%; background-color: #333; color: #fff; border: 1px solid #555; padding: 10px; font-family: monospace;"></textarea>
+  </div>
+
   <form method="POST" action="/close_all_positions" onsubmit="return confirm('Close all open positions?')">
     <button type="submit" class="close-all-btn">Close All Open Positions</button>
   </form>
 
   <footer>
-    &copy; TradeX Bot Dashboard
+    &copy; TradeX Bot | <a href="https://github.com/Sentello/TradeX">GitHub</a>
   </footer>
 </body>
 </html>

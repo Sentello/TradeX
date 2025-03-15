@@ -43,19 +43,38 @@ exchanges = {
 
 def process_signal(data):
     try:
-        logger.info(f"Received signal: {data}")
+        # Validate required fields
+        required_fields = ["EXCHANGE", "SYMBOL", "SIDE", "ORDER_TYPE", "QUANTITY"]
+        for field in required_fields:
+            if field not in data:
+                logger.error(f"❌ Missing required field: {field}")
+                return
+
         exchange_name = data["EXCHANGE"].lower()
         symbol = data["SYMBOL"]
         side = data["SIDE"].lower()
         order_type = data["ORDER_TYPE"].lower()
-        quantity = float(data["QUANTITY"])
+        try:
+            quantity = float(data["QUANTITY"])
+        except ValueError:
+            logger.error("❌ Invalid QUANTITY: must be a number")
+            return
+
+        # Validate side
+        if side not in ["buy", "sell"]:
+            logger.error(f"❌ Invalid SIDE: {side}. Must be 'buy' or 'sell'.")
+            return
 
         # Validate required fields based on order type
         if order_type == "limit":
             if "PRICE" not in data:
                 logger.error("❌ Missing required field 'PRICE' for limit order.")
                 return
-            price = float(data["PRICE"])
+            try:
+                price = float(data["PRICE"])
+            except ValueError:
+                logger.error("❌ Invalid PRICE: must be a number")
+                return
 
         exchange = exchanges.get(exchange_name)
         if not exchange:

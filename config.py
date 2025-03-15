@@ -7,7 +7,7 @@ load_dotenv()
 # Dashboard
 DASHBOARD_HOST = os.getenv("DASHBOARD_HOST", "0.0.0.0")
 DASHBOARD_PORT = int(os.getenv("DASHBOARD_PORT", "5000"))
-DASHBOARD_PASSWORD = os.getenv("DASHBOARD_PASSWORD", "default_password")
+DASHBOARD_PASSWORD = os.getenv("DASHBOARD_PASSWORD", "")
 
 # Flask session
 FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "hardcoded-default-key")
