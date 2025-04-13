@@ -156,7 +156,7 @@ def close_position(exchange_name, symbol):
         positions = get_positions().get(exchange_name, [])
         for pos in positions:
             if pos["symbol"] == symbol:
-                side = "sell" if pos["side"] == "buy" else "buy"
+                side = "sell" if (pos["side"] == "buy" or pos["side"] == "long") else "buy"
                 order = exchange.create_market_order(symbol, side, pos["contracts"])
                 logger.info(f"✅ Position closed: {order}")
                 return {"status": "success", "order": order}
