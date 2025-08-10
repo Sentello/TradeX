@@ -5,5 +5,4 @@ __pycache__/
 .env
 venv/
 logs/
-ideas.txt
 .history/
