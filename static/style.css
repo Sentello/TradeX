@@ -1,0 +1,41 @@
+/* static/style.css */
+
+body {
+    background-color: #212529;
+}
+
+.card {
+    border: 1px solid rgba(255, 255, 255, 0.125);
+}
+
+.card-header {
+    background-color: rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.125);
+}
+
+#logs-textarea {
+    background-color: #343a40;
+    color: #f8f9fa;
+    border: 1px solid #495057;
+}
+
+/* --- Animations & Transitions --- */
+
+.btn {
+    transition: all 0.3s ease-in-out;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(255, 255, 255, 0.075);
+    transform: scale(1.01);
+    transition: all 0.2s ease-in-out;
+}
+
+i.bi {
+    margin-right: 8px;
+}
