@@ -8,11 +8,12 @@ attrs==25.3.0
 Authlib==1.6.5
 bcrypt==5.0.0
 blinker==1.9.0
-ccxt==4.5.7
+ccxt==4.5.28
 certifi==2025.10.5
 cffi==2.0.0
 charset-normalizer==3.4.3
 click==8.3.0
+coincurve==21.0.0
 cryptography==46.0.2
 dparse==0.6.4
 filelock==3.19.1
