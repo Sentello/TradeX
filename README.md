@@ -181,6 +181,12 @@ Set the `MODE` variable in your `.env` file to one of the following options:
    - Rename `.env.example` to `.env` or create a new `.env` file.
    - Add your exchange API keys, dashboard password, webhook PIN, and other required configurations.
 
+   Alternatively, you can use the `generate_credentials.py` script to generate secure credential values:
+   ```bash
+   python generate_credentials.py
+   ```
+   This will generate values like `FLASK_SECRET_KEY=...` and `DASHBOARD_PASSWORD=$2b$12$...` which can be copied into your `.env` file.
+
 5. **Run the Application Locally**:
    ```bash
    python main.py
