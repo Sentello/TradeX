@@ -36,6 +36,9 @@ if config.BYBIT_API_KEY and config.BYBIT_API_SECRET:
             'apiKey': config.BYBIT_API_KEY,
             'secret': config.BYBIT_API_SECRET
         })
+        # Enable timestamp synchronization to prevent "invalid request" errors
+        exchanges['bybit'].options["recvWindow"] = 5000
+        exchanges['bybit'].options["adjustForTimeDifference"] = True
         logger.info("✅ Bybit successfully initialized!")
     except Exception as e:
         logger.error(f"❌ Error initializing Bybit: {e}")
@@ -45,8 +48,13 @@ if config.BINANCE_API_KEY and config.BINANCE_API_SECRET:
     try:
         exchanges['binance'] = ccxt.binance({
             'apiKey': config.BINANCE_API_KEY,
-            'secret': config.BINANCE_API_SECRET
+            'secret': config.BINANCE_API_SECRET,
+            'options': {
+                'defaultType': 'future'  # Use futures account by default
+            }
         })
+        # Suppress the warning about fetching open orders without specifying a symbol
+        exchanges['binance'].options["warnOnFetchOpenOrdersWithoutSymbol"] = False
         logger.info("✅ Binance successfully initialized!")
     except Exception as e:
         logger.error(f"❌ Error initializing Binance: {e}")
@@ -75,7 +83,7 @@ def get_positions():
         try:
             all_positions = exchange.fetch_positions()
             for pos in all_positions:
-                if pos.get('contracts', 0) > 0:  # Only return active positions
+                if (pos.get('contracts', 0) != 0) or (pos.get('notional', 0) != 0):  # Futures positions have non-zero contracts or notional
                     positions_data[exchange_name].append({
                         "symbol": pos.get('symbol', 'N/A'),
                         "side": pos.get('side', 'N/A'),
@@ -109,8 +117,10 @@ def get_pending_orders():
         try:
             orders = exchange.fetch_open_orders()
             pending_orders[exchange_name] = orders
+            logger.info(f"✅ [get_pending_orders] Successfully fetched {len(orders)} orders for {exchange_name}")
         except Exception as e:
             logger.error(f"❌ [get_pending_orders] Error fetching orders for {exchange_name}: {e}")
+            pending_orders[exchange_name] = []
 
     return pending_orders
 
@@ -218,11 +228,21 @@ def calculate_summary_stats():
 
     for exchange_name, exchange in exchanges.items():
         try:
+            # For futures accounts, fetch balance differently if needed
             account_balance = exchange.fetch_balance()
+
+            # Log the balance breakdown for debugging
+            logger.info(f"🔍 [calculate_summary_stats] Balance breakdown for {exchange_name}: {account_balance.get('total', {})}")
+
             positions = get_positions().get(exchange_name, [])
 
-            # Calculate portfolio value (assuming USDT as base currency)
-            summary_stats["portfolio_value"] += account_balance.get('USDT', {}).get('total', 0.0)
+            # Calculate portfolio value - check for USDT, USDC, BUSD, or other stablecoins
+            total_balance = 0.0
+            for currency, balance_info in account_balance.get('total', {}).items():
+                if currency in ['USDT', 'USDC', 'BUSD', 'TUSD']:  # Common stablecoins
+                    total_balance += balance_info or 0.0
+                    logger.info(f"💰 [calculate_summary_stats] Found {balance_info} {currency} in {exchange_name}")
+            summary_stats["portfolio_value"] += total_balance
 
             # Calculate total PNL and margin used from positions
             for pos in positions:
