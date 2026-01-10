@@ -402,7 +402,7 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ---
 
-## 🙏 Support the Project
+## 🙏Support the Project
 If you find this project useful and would like to support me, consider making a donation.
 
 ### Scan to Donate
