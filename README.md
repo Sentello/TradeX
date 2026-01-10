@@ -420,7 +420,7 @@ If you find this project useful and would like to support me, consider making a 
 
 
 
-[![Buy me a coffee](https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png)](https://www.buymeacoffee.com/sentello)
+<a href="https://www.buymeacoffee.com/sentello"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" width="200" alt="Buy me a coffee"></a>
 
 Thank You!
 
