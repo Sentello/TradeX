@@ -419,9 +419,6 @@ If you find this project useful and would like to support me, consider making a 
 ![image](https://github.com/user-attachments/assets/21981a90-50f2-46ef-aa29-7c68c9d1742b)
 
 
-
-<a href="https://www.buymeacoffee.com/sentello"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" width="200" alt="Buy me a coffee"></a>
-
 Thank You!
 
 ---
