@@ -101,3 +101,61 @@ def test_compose_keeps_the_dashboard_off_the_public_network():
 def test_compose_still_exposes_the_webhook():
     """TradingView has to be able to POST to it."""
     assert "5005:5005" in _published_ports()
+
+
+# --- deployment documentation ---
+
+def _ini_blocks(path, marker):
+    """Fenced ```ini blocks in a markdown file, split into lines."""
+    blocks, current = [], None
+    for line in open(path, encoding="utf-8"):
+        if line.startswith("```ini"):
+            current = []
+        elif line.startswith("```") and current is not None:
+            blocks.append(current)
+            current = None
+        elif current is not None:
+            current.append(line.rstrip("\n"))
+    return [b for b in blocks if any(marker in l for l in b)]
+
+
+def test_systemd_units_have_no_trailing_comments():
+    """systemd has no inline comments: `User=me  # note` sets the user to the
+    whole string and the unit fails to start."""
+    offenders = []
+    for block in _ini_blocks("HOWTO.md", "[Unit]"):
+        for line in block:
+            if line.startswith("#") or not line.strip():
+                continue
+            if "=" in line and "#" in line.split("=", 1)[1]:
+                offenders.append(line)
+    assert not offenders, f"trailing comments break these: {offenders}"
+
+
+def test_systemd_units_cover_every_service():
+    units = _ini_blocks("HOWTO.md", "[Unit]")
+    started = " ".join(l for b in units for l in b)
+    assert "serve.py dashboard" in started
+    assert "serve.py webhook" in started
+    assert "email_reader.py" in started, "the email reader had no unit"
+
+
+def test_host_supervisor_config_is_not_the_container_one():
+    """The repo's supervisord.conf runs as PID 1 in the container: it sets
+    nodaemon and points at /app, so it cannot be dropped into conf.d."""
+    howto = open("HOWTO.md", encoding="utf-8").read()
+    assert "sudo cp supervisord.conf /etc/supervisor" not in howto
+
+    for block in _ini_blocks("HOWTO.md", "[program:"):
+        joined = "\n".join(block)
+        assert "nodaemon" not in joined
+        assert "[supervisord]" not in joined
+        assert "directory=/app" not in joined, "container path in a host config"
+
+
+def test_host_supervisor_config_covers_every_service():
+    blocks = _ini_blocks("HOWTO.md", "[program:")
+    joined = "\n".join(l for b in blocks for l in b)
+    assert "serve.py dashboard" in joined
+    assert "serve.py webhook" in joined
+    assert "email_reader.py" in joined

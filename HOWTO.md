@@ -27,13 +27,75 @@ This guide provides step-by-step instructions for running TradeX as a background
 
 ### **Steps**
 
-#### 1. Copy the Provided `supervisord.conf` File
-If you're running TradeX locally (not in Docker), copy the `supervisord.conf` file to the appropriate directory:
+#### 1. Create a Supervisor Config for Your Host
+
+> **Do not copy the repository's `supervisord.conf`.** That file configures
+> supervisor as PID 1 *inside the container*. It sets `nodaemon=true`, owns
+> the `[supervisord]` and `[supervisorctl]` sections, and points every
+> program at `/app`. Dropped into `conf.d/` on a host it collides with your
+> system's own `[supervisord]` section and refers to paths that do not
+> exist there.
+
+Files in `/etc/supervisor/conf.d/` define programs only. Create
+`/etc/supervisor/conf.d/tradex.conf`:
+
 ```bash
-sudo cp supervisord.conf /etc/supervisor/conf.d/tradex.conf
+sudo nano /etc/supervisor/conf.d/tradex.conf
 ```
 
-For Docker-based setups, the `supervisord.conf` file is already integrated into the `Dockerfile`, so no additional setup is required.
+```ini
+[program:tradex_dashboard]
+command=/path/to/tradex/.venv/bin/python /path/to/tradex/serve.py dashboard
+directory=/path/to/tradex
+user=your_user
+autostart=true
+autorestart=true
+startsecs=5
+stopwaitsecs=10
+stdout_logfile=/var/log/supervisor/tradex_dashboard.out.log
+stderr_logfile=/var/log/supervisor/tradex_dashboard.err.log
+priority=10
+
+[program:tradex_webhook]
+command=/path/to/tradex/.venv/bin/python /path/to/tradex/serve.py webhook
+directory=/path/to/tradex
+user=your_user
+autostart=true
+autorestart=true
+startsecs=5
+stopwaitsecs=10
+stdout_logfile=/var/log/supervisor/tradex_webhook.out.log
+stderr_logfile=/var/log/supervisor/tradex_webhook.err.log
+priority=20
+
+# Exits 0 immediately when MODE excludes email, so autorestart=unexpected
+# stops supervisor from respawning it forever.
+[program:tradex_email_reader]
+command=/path/to/tradex/.venv/bin/python /path/to/tradex/email_reader.py
+directory=/path/to/tradex
+user=your_user
+autostart=true
+autorestart=unexpected
+exitcodes=0
+startsecs=0
+stopwaitsecs=15
+stdout_logfile=/var/log/supervisor/tradex_email_reader.out.log
+stderr_logfile=/var/log/supervisor/tradex_email_reader.err.log
+priority=30
+
+[group:tradex]
+programs=tradex_dashboard,tradex_webhook,tradex_email_reader
+priority=999
+```
+
+Replace `/path/to/tradex` and `your_user` throughout, and use your
+virtualenv's interpreter — a bare `python` may not be the one with the
+dependencies installed. Ports are not set here: `serve.py` reads
+`DASHBOARD_HOST`/`DASHBOARD_PORT` and `WEBHOOK_HOST`/`WEBHOOK_PORT` from
+`.env`.
+
+For Docker-based setups none of this applies — the container's
+`supervisord.conf` is already wired into the `Dockerfile`.
 
 #### 2. Reload Supervisor
 After copying the configuration file, reload `supervisor` to recognize the new configuration:
@@ -56,8 +118,8 @@ sudo supervisorctl status
 
 You should see output similar to:
 ```
-tradex:dashboard_app      RUNNING   pid 1234, uptime 0:05:23
-tradex:webhook_app        RUNNING   pid 1235, uptime 0:05:23
+tradex:tradex_dashboard      RUNNING   pid 1234, uptime 0:05:23
+tradex:tradex_webhook        RUNNING   pid 1235, uptime 0:05:23
 tradex:email_reader       RUNNING   pid 1236, uptime 0:05:23
 ```
 
@@ -102,19 +164,26 @@ sudo nano dashboard_app.service
 ```
 
 Add the following content:
+> **systemd does not support trailing comments.** A line like
+> `User=you  # your username` sets the user to the whole string including
+> the comment, and the unit fails to start. Put comments on their own line,
+> as below, and substitute the placeholder values directly.
+
 ```ini
 [Unit]
-Description=Gunicorn instance to serve TradeX Dashboard
+Description=TradeX Dashboard
 After=network.target
 
 [Service]
-User=your_user  # Replace with your username (e.g., "ubuntu" or "root")
-Group=www-data  # Replace with your group (optional)
-WorkingDirectory=/path/to/tradex  # Replace with the absolute path to your project directory
-ExecStart=/path/to/venv/bin/python /path/to/tradex/serve.py dashboard
+# Replace your_user, and the two /path/to/... paths, with real values.
+User=your_user
+Group=your_user
+WorkingDirectory=/path/to/tradex
+ExecStart=/path/to/tradex/.venv/bin/python /path/to/tradex/serve.py dashboard
 Restart=always
-Environment="PATH=/path/to/venv/bin"  # Replace with the path to your virtual environment's bin folder
-EnvironmentFile=/path/to/tradex/.env  # Optional: Load environment variables from .env
+RestartSec=5
+Environment="PATH=/path/to/tradex/.venv/bin"
+EnvironmentFile=/path/to/tradex/.env
 
 [Install]
 WantedBy=multi-user.target
@@ -129,64 +198,101 @@ sudo nano webhook_app.service
 Add the following content:
 ```ini
 [Unit]
-Description=Gunicorn instance to serve TradeX Webhook
+Description=TradeX Webhook Receiver
 After=network.target
 
 [Service]
-User=your_user  # Replace with your username
-Group=www-data  # Replace with your group (optional)
-WorkingDirectory=/path/to/tradex  # Replace with the absolute path to your project directory
-ExecStart=/path/to/venv/bin/python /path/to/tradex/serve.py webhook
+# Replace your_user, and the two /path/to/... paths, with real values.
+User=your_user
+Group=your_user
+WorkingDirectory=/path/to/tradex
+ExecStart=/path/to/tradex/.venv/bin/python /path/to/tradex/serve.py webhook
 Restart=always
-Environment="PATH=/path/to/venv/bin"  # Replace with the path to your virtual environment's bin folder
-EnvironmentFile=/path/to/tradex/.env  # Optional: Load environment variables from .env
+RestartSec=5
+Environment="PATH=/path/to/tradex/.venv/bin"
+EnvironmentFile=/path/to/tradex/.env
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-#### 4. Reload Systemd
+#### 4. Create a Service File for the Email Reader
+Only needed when `MODE` is `email` or `both`. The reader exits 0 immediately
+if email ingestion is disabled, so `Restart=on-failure` stops systemd
+restarting it forever in that case:
+```bash
+sudo nano email_reader.service
+```
+
+```ini
+[Unit]
+Description=TradeX Email Signal Reader
+After=network.target
+
+[Service]
+# Replace your_user, and the two /path/to/... paths, with real values.
+User=your_user
+Group=your_user
+WorkingDirectory=/path/to/tradex
+ExecStart=/path/to/tradex/.venv/bin/python /path/to/tradex/email_reader.py
+Restart=on-failure
+RestartSec=5
+Environment="PATH=/path/to/tradex/.venv/bin"
+EnvironmentFile=/path/to/tradex/.env
+
+[Install]
+WantedBy=multi-user.target
+```
+
+#### 5. Reload Systemd
 Reload `systemd` to recognize the new services:
 ```bash
 sudo systemctl daemon-reload
 ```
 
-#### 5. Start the Services
-Start both the dashboard and webhook services:
+#### 6. Start the Services
+Start the services. Include `email_reader` only if `MODE` is `email` or `both`:
 ```bash
 sudo systemctl start dashboard_app
 sudo systemctl start webhook_app
+sudo systemctl start email_reader
 ```
 
-#### 6. Enable the Services to Start on Boot
-To ensure the services start automatically when the system boots:
+#### 7. Enable the Services to Start on Boot
 ```bash
 sudo systemctl enable dashboard_app
 sudo systemctl enable webhook_app
+sudo systemctl enable email_reader
 ```
 
-#### 7. Check the Status of the Services
-Verify that both services are running without errors:
+#### 8. Check the Status of the Services
+Verify that the services are running without errors:
 ```bash
 sudo systemctl status dashboard_app
 sudo systemctl status webhook_app
+sudo systemctl status email_reader
 ```
 
 If everything is working correctly, you should see output similar to:
 ```
-● dashboard_app.service - Gunicorn instance to serve TradeX Dashboard
+● dashboard_app.service - TradeX Dashboard
    Loaded: loaded (/etc/systemd/system/dashboard_app.service; enabled; vendor preset: enabled)
    Active: active (running) since ...
 ```
 
-#### 8. View Logs
+`email_reader` showing `inactive (dead)` with an exit status of `0` is
+expected when `MODE=webhook` — it means the reader saw email ingestion was
+disabled and stopped cleanly.
+
+#### 9. View Logs
 To debug issues or monitor logs, use `journalctl`:
 ```bash
 sudo journalctl -u dashboard_app -f
 sudo journalctl -u webhook_app -f
+sudo journalctl -u email_reader -f
 ```
 
-#### 9. Restart or Stop the Services
+#### 10. Restart or Stop the Services
 To restart or stop the services:
 ```bash
 sudo systemctl restart dashboard_app
