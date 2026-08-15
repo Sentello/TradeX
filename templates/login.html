@@ -1,33 +1,93 @@
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Sign in · TradeX Bot</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-<body>
-    <div class="container">
-        <div class="row justify-content-center align-items-center vh-100">
-            <div class="col-md-6 col-lg-4">
-                <div class="card">
-                    <div class="card-body">
-                        <h1 class="card-title text-center mb-4">Login</h1>
-                        <form method="POST" action="/login">
-                            <div class="mb-3">
-                                <input type="password" name="password" id="password" class="form-control" placeholder="Enter Password" required>
-                            </div>
-                            <button type="submit" class="btn btn-success w-100">Login</button>
-                            {% if error %}
-                            <p class="text-danger text-center mt-3">{{ error }}</p>
-                            {% endif %}
-                        </form>
-                    </div>
-                </div>
-            </div>
+<body class="login-page">
+    <main class="login-card">
+        <div class="login-brand">
+            <span class="login-mark" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 17l6-6 4 4 8-8"></path>
+                    <path d="M21 7v5h-5"></path>
+                </svg>
+            </span>
+            <h1 class="login-title">TradeX Bot</h1>
+            <p class="login-subtitle">Sign in to the trading dashboard</p>
         </div>
-    </div>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+        {% if error %}
+        <div class="login-alert login-alert--{{ error_kind|default('danger') }}" role="alert">
+            {% if error_kind == 'warning' %}
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="3" y="11" width="18" height="11" rx="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+            {% else %}
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M12 8v4"></path>
+                <path d="M12 16h.01"></path>
+            </svg>
+            {% endif %}
+            <span>{{ error }}</span>
+        </div>
+        {% endif %}
+
+        <form method="POST" action="{{ url_for('login') }}">
+            <div class="login-field">
+                <span class="login-field-icon" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                         fill="none" stroke="currentColor" stroke-width="2"
+                         stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
+                </span>
+                <input type="password" name="password" id="password" class="login-input"
+                       placeholder="Password" autocomplete="current-password"
+                       autofocus required>
+                <button type="button" class="login-toggle" id="toggle-password"
+                        aria-label="Show password" aria-controls="password">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24"
+                         fill="none" stroke="currentColor" stroke-width="2"
+                         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                </button>
+            </div>
+            <button type="submit" class="login-submit">Sign in</button>
+        </form>
+
+        <p class="login-footer">
+            <a href="https://github.com/Sentello/TradeX" rel="noopener">TradeX Bot on GitHub</a>
+        </p>
+    </main>
+
+    <script>
+        // Show/hide the password without swapping the icon markup.
+        (function () {
+            const input = document.getElementById('password');
+            const toggle = document.getElementById('toggle-password');
+
+            toggle.addEventListener('click', function () {
+                const revealed = input.type === 'text';
+                input.type = revealed ? 'password' : 'text';
+                toggle.setAttribute('aria-label', revealed ? 'Show password' : 'Hide password');
+                input.focus();
+            });
+        })();
+    </script>
 </body>
 </html>

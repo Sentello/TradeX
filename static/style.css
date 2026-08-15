@@ -39,3 +39,235 @@ body {
 i.bi {
     margin-right: 8px;
 }
+
+/* =========================================
+   Login page
+   Scoped to .login-page so the dashboard is
+   unaffected by anything below.
+   ========================================= */
+
+.login-page {
+    --accent: #2ea043;
+    --accent-bright: #3fb950;
+    --surface: #161b22;
+    --border: rgba(255, 255, 255, 0.09);
+    --text-muted: #8b949e;
+
+    /* This page no longer loads Bootstrap, so tell the browser to render
+       native form controls (autofill, the built-in reveal icon) dark. */
+    color-scheme: dark;
+
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background:
+        radial-gradient(ellipse 80% 60% at 50% -10%, rgba(46, 160, 67, 0.16), transparent 70%),
+        radial-gradient(ellipse 60% 50% at 50% 110%, rgba(46, 160, 67, 0.07), transparent 70%),
+        #0d1117;
+}
+
+.login-card {
+    width: 100%;
+    max-width: 400px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2.5rem 2rem 2rem;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.04) inset,
+        0 16px 40px rgba(0, 0, 0, 0.5);
+    animation: login-rise 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes login-rise {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.login-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    margin-bottom: 1.75rem;
+}
+
+.login-mark {
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    margin-bottom: 0.9rem;
+    border-radius: 14px;
+    color: var(--accent-bright);
+    background: rgba(46, 160, 67, 0.12);
+    border: 1px solid rgba(46, 160, 67, 0.3);
+}
+
+.login-mark svg { display: block; }
+
+.login-title {
+    margin: 0;
+    font-size: 1.4rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: #e6edf3;
+}
+
+.login-subtitle {
+    margin: 0.3rem 0 0;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+.login-field {
+    position: relative;
+    margin-bottom: 1rem;
+}
+
+.login-field .login-field-icon {
+    position: absolute;
+    top: 50%;
+    left: 0.9rem;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    pointer-events: none;
+    transition: color 0.2s ease;
+}
+
+.login-input {
+    width: 100%;
+    padding: 0.8rem 3rem 0.8rem 2.75rem;
+    font-size: 0.95rem;
+    color: #e6edf3;
+    background: #0d1117;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.login-input::placeholder { color: #6e7681; }
+
+/* Chrome paints autofilled fields pale yellow, which wrecks the dark card.
+   There is no way to set the background directly, hence the inset shadow. */
+.login-input:-webkit-autofill,
+.login-input:-webkit-autofill:hover,
+.login-input:-webkit-autofill:focus {
+    -webkit-text-fill-color: #e6edf3;
+    -webkit-box-shadow: 0 0 0 100px #0d1117 inset;
+    caret-color: #e6edf3;
+}
+
+.login-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(46, 160, 67, 0.22);
+}
+
+.login-field:focus-within .login-field-icon { color: var(--accent-bright); }
+
+.login-toggle {
+    position: absolute;
+    top: 50%;
+    right: 0.5rem;
+    transform: translateY(-50%);
+    display: grid;
+    place-items: center;
+    width: 2.1rem;
+    height: 2.1rem;
+    padding: 0;
+    color: var(--text-muted);
+    background: transparent;
+    border: 0;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.login-toggle:hover { color: #e6edf3; background: rgba(255, 255, 255, 0.06); }
+
+.login-toggle:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+.login-submit {
+    width: 100%;
+    padding: 0.8rem 1rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #fff;
+    background: linear-gradient(180deg, var(--accent-bright), var(--accent));
+    border: 1px solid rgba(0, 0, 0, 0.25);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: filter 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.login-submit:hover {
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(46, 160, 67, 0.3);
+}
+
+.login-submit:active { transform: translateY(0); }
+
+.login-submit:focus-visible {
+    outline: 2px solid var(--accent-bright);
+    outline-offset: 2px;
+}
+
+.login-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    margin-bottom: 1.25rem;
+    padding: 0.7rem 0.85rem;
+    font-size: 0.86rem;
+    line-height: 1.4;
+    border-radius: 9px;
+    border: 1px solid transparent;
+}
+
+.login-alert svg { flex: none; margin-top: 1px; }
+
+.login-alert--danger {
+    color: #ff8a80;
+    background: rgba(248, 81, 73, 0.11);
+    border-color: rgba(248, 81, 73, 0.32);
+}
+
+.login-alert--warning {
+    color: #e3b341;
+    background: rgba(210, 153, 34, 0.11);
+    border-color: rgba(210, 153, 34, 0.32);
+}
+
+.login-footer {
+    margin-top: 1.75rem;
+    font-size: 0.8rem;
+    text-align: center;
+    color: var(--text-muted);
+}
+
+.login-footer a {
+    color: var(--text-muted);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(139, 148, 158, 0.35);
+}
+
+.login-footer a:hover { color: #e6edf3; }
+
+@media (max-width: 420px) {
+    .login-card { padding: 2rem 1.4rem 1.6rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .login-card { animation: none; }
+    .login-submit:hover { transform: none; }
+}

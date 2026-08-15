@@ -119,6 +119,7 @@ def login():
             return render_template(
                 "login.html",
                 error=f"Too many failed attempts. Try again in {int(locked / 60) + 1} minute(s).",
+                error_kind="warning",
             ), 429
 
         if _password_matches(request.form.get("password")):
@@ -136,7 +137,7 @@ def login():
             f"Invalid login attempt from {client}."
             + (f" Locked out for {locked:.0f}s." if locked else "")
         )
-        return render_template("login.html", error="Invalid password"), 401
+        return render_template("login.html", error="Invalid password", error_kind="danger"), 401
     return render_template("login.html")
 
 
