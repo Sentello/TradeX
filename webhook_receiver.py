@@ -22,10 +22,9 @@ ALLOWED_NETWORKS = parse_networks(config.WEBHOOK_ALLOWED_IPS)
 if ALLOWED_NETWORKS:
     logger.info(f"🔒 /webhook restricted to: {config.WEBHOOK_ALLOWED_IPS}")
 else:
-    logger.warning(
-        "⚠ /webhook accepts any source address. Set WEBHOOK_ALLOWED_IPS to "
-        "TradingView's published IPs to shrink the attack surface."
-    )
+    # Stated, not recommended: an allowlist is only workable when the sender
+    # has stable addresses, and a stale entry silently rejects real signals.
+    logger.info("/webhook accepts any source address (WEBHOOK_ALLOWED_IPS not set).")
 
 _throttle = FailureThrottle(config.WEBHOOK_MAX_FAILURES, config.WEBHOOK_LOCKOUT_SECONDS)
 _duplicates = DuplicateFilter(config.WEBHOOK_DEDUP_SECONDS)

@@ -274,7 +274,7 @@ back to an insecure default. Generate all three with
 
 | Variable | Default | Description |
 |---|---|---|
-| `WEBHOOK_ALLOWED_IPS` | *(empty — any address)* | Comma-separated IPs or CIDR blocks allowed to reach `/webhook`. **The most effective protection available**: restricting to TradingView's published IPs removes brute force as a concern entirely. |
+| `WEBHOOK_ALLOWED_IPS` | *(empty — any address)* | Comma-separated IPs or CIDR blocks allowed to reach `/webhook`. Off by default. Only practical when the sender's addresses are stable — see the caveat under [Security Best Practices](#security-best-practices). |
 | `WEBHOOK_MAX_FAILURES` | `5` | Bad PINs from one address before it is locked out. |
 | `WEBHOOK_LOCKOUT_SECONDS` | `300` | How long that lockout lasts. Applied per source IP, never endpoint-wide, so an attacker cannot stop your real alerts by sending junk. |
 | `WEBHOOK_DEDUP_SECONDS` | `60` | Ignore an identical signal repeated within this window, so a lost response cannot become a doubled position. See [Duplicate signals](#duplicate-signals). Set to `0` to disable. |
@@ -502,7 +502,7 @@ For further assistance, check the logs in the `logs/` directory. Each service wr
 
 ## Security Best Practices
 
-- **Restrict who can reach the webhook**: set `WEBHOOK_ALLOWED_IPS` to TradingView's published source IPs. This is the single most effective control, because it removes brute-forcing the PIN as a possibility rather than merely slowing it down.
+- **Restricting who can reach the webhook** with `WEBHOOK_ALLOWED_IPS` removes brute-forcing the PIN as a possibility rather than merely slowing it down — but **only adopt it if your sender's addresses are stable**. TradingView does not guarantee its webhook source IPs, and a stale entry rejects real trade signals with a `403` that looks like nothing at all until you read the logs. Left off by default for that reason. It is a good fit when signals arrive via a proxy or VPS you control.
 - **Use a long, random `WEBHOOK_PIN`**: it is the only credential on an endpoint that places real orders. A 6-digit numeric PIN is a keyspace of 1,000,000 — crackable in about an hour at 100 requests/second. `python generate_credentials.py` produces a 43-character one.
 - **Never reuse the PIN as the dashboard password**: the PIN travels in plaintext inside alert bodies and across mail servers.
 - **Restrict access to the dashboard**: bind it to `127.0.0.1` or use a firewall. It has no TLS of its own, so the password and session cookie cross the network in cleartext unless you put it behind a reverse proxy.
