@@ -16,21 +16,33 @@ class ConfigError(RuntimeError):
     """Raised at import time when the app is not safe to start."""
 
 
+def _unescape(value):
+    """Turn Compose's `$$` escape into a literal `$`.
+
+    Docker Compose interpolates `.env` and treats `$NAME` as a variable.
+    A bcrypt hash is `$2b$12$...`, so the third `$` plus the next
+    characters get eaten unless every `$` is written as `$$`. python-dotenv
+    does not do that rewrite, so the same file would otherwise disagree
+    locally vs in Docker.
+    """
+    return value.replace("$$", "$")
+
+
 def _required(name, hint):
     """Secrets have no safe default: refuse to start rather than guess one."""
-    value = os.getenv(name, "").strip()
+    value = _unescape(os.getenv(name, "").strip())
     if not value:
         raise ConfigError(f"{name} is not set in .env. {hint}")
     return value
 
 
 def _optional(name, default):
-    value = os.getenv(name, "").strip()
+    value = _unescape(os.getenv(name, "").strip())
     return value or default
 
 
 def _int(name, default):
-    value = os.getenv(name, "").strip()
+    value = _unescape(os.getenv(name, "").strip())
     if not value:
         return default
     try:
@@ -40,7 +52,7 @@ def _int(name, default):
 
 
 def _bool(name, default):
-    value = os.getenv(name, "").strip().lower()
+    value = _unescape(os.getenv(name, "").strip()).lower()
     if not value:
         return default
     return value in ("true", "1", "yes", "on")

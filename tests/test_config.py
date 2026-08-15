@@ -22,6 +22,18 @@ def test_plaintext_dashboard_password_is_rejected(app_env):
     assert "bcrypt" in str(exc.value)
 
 
+def test_compose_escaped_bcrypt_hash_is_accepted(app_env):
+    """A bcrypt hash in .env must be written $$2b$$12$$... so Compose
+    does not treat $2b$12$payload as interpolation. Local load_dotenv
+    leaves the doubles; config must turn them back into a real hash."""
+    config = app_env(
+        modules=["config"],
+        DASHBOARD_PASSWORD="$$2b$$12$$abcdefghijklmnopqrstuv",
+    )["config"]
+    assert config.DASHBOARD_PASSWORD.startswith("$2b$12$")
+    assert "$$" not in config.DASHBOARD_PASSWORD
+
+
 def test_invalid_mode_is_rejected(app_env):
     with pytest.raises(Exception) as exc:
         app_env(modules=["config"], MODE="banana")
