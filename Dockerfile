@@ -1,28 +1,29 @@
-# Use Python 3.10 as the base image
-FROM python:3.10
+# Matches the Python version used for local development (.venv is 3.14), so
+# the container cannot diverge from what the tests actually run against.
+# 3.10 was previously used and reaches end of life in October 2026; every
+# pinned dependency already required >=3.10, leaving no headroom.
+FROM python:3.14-slim
 
 # Set the working directory inside the container
 WORKDIR /app
+
+# System dependencies. curl is needed by the HEALTHCHECK below, which the
+# slim image does not ship.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    supervisor \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies before copying the source, so editing code
+# does not invalidate the (slow) dependency layer on every rebuild.
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the application files to the container.
 # .env is deliberately NOT copied: it is excluded in .dockerignore and
 # supplied at runtime via docker-compose's env_file. Baking it in would
 # leave the API keys in the image layers permanently.
 COPY . /app
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    supervisor \
-    && rm -rf /var/lib/apt/lists/*
-
-# Create necessary directories
-#RUN mkdir -p /var/log/supervisor /app/logs
-
-# Set permissions for logs directory
-#RUN chmod -R 777 /var/log/supervisor /app/logs
-
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the Supervisor configuration file
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf

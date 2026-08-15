@@ -40,5 +40,4 @@ docker-compose.*.yaml
 *.MD
 tests/
 build_and_run.sh
-requirements-dev.txt
 generate_credentials.py
