@@ -95,6 +95,21 @@ class DuplicateFilter:
             self._local.conn = conn
         return conn
 
+    def _reset_connection(self):
+        """Drop a connection that has failed, so the next call reconnects.
+
+        Without this a single failure is permanent: the broken handle stays
+        cached on the thread and every later check fails open, silently
+        disabling duplicate suppression for the life of the process.
+        """
+        conn = getattr(self._local, "conn", None)
+        self._local.conn = None
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
     def _init_db(self):
         conn = self._connect()
         conn.execute(
@@ -145,6 +160,8 @@ class DuplicateFilter:
         except Exception as e:
             # Fail open, loudly. Refusing every order because a state file is
             # unwritable would be worse than the duplicate this prevents.
+            # Discard the connection so this stays a transient failure.
+            self._reset_connection()
             logger.error(f"❌ Duplicate check failed, allowing the signal through: {e}")
             return False
 
@@ -155,10 +172,15 @@ class DuplicateFilter:
         try:
             self._connect().execute("DELETE FROM seen WHERE key = ?", (key,))
         except Exception as e:
+            self._reset_connection()
             logger.error(f"❌ Could not clear duplicate key {key}: {e}")
 
     def count(self):
         """Rows currently tracked. For tests and diagnostics."""
         if self.window_seconds <= 0:
             return 0
-        return self._connect().execute("SELECT COUNT(*) FROM seen").fetchone()[0]
+        try:
+            return self._connect().execute("SELECT COUNT(*) FROM seen").fetchone()[0]
+        except Exception:
+            self._reset_connection()
+            raise

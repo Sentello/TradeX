@@ -43,8 +43,22 @@ def decode_subject(msg):
         return raw.strip()
 
 
+def normalize_subject(subject):
+    """Decode a subject to the form the JSON parser sees.
+
+    Must run before logging, not after: an alert encoded as
+    &quot;PIN&quot;: &quot;...&quot; parses fine as a signal, but redaction
+    looks for a real "PIN": and would miss it, putting the secret in the log.
+    """
+    text = html.unescape(subject)                       # &quot; -> "
+    text = re.sub(r'[\u200B-\u200D\uFEFF]', '', text)  # zero-width spaces
+    return text.replace('\n', '').replace('\r', '')      # newline artifacts
+
+
 def parse_email_subject(subject):
     """Extracts and parses JSON data from the email subject."""
+    subject = normalize_subject(subject)
+
     # Redact before truncating: an alert subject is the raw JSON including
     # the PIN, and the dashboard serves these log files over /logs.
     logger.info(
@@ -55,17 +69,7 @@ def parse_email_subject(subject):
         return None
 
     try:
-        # Extract the JSON part after "Alert:"
-        json_part = subject.split("Alert:", 1)[1].strip()
-
-        # Decode HTML entities (e.g., &nbsp;, &zwj;)
-        json_part = html.unescape(json_part)
-
-        # Remove invisible characters and whitespace artifacts
-        json_part = re.sub(r'[\u200B-\u200D\uFEFF]', '', json_part)  # Remove zero-width spaces
-        json_part = json_part.replace('\n', '').replace('\r', '')  # Remove newlines
-
-        return json.loads(json_part)
+        return json.loads(subject.split("Alert:", 1)[1].strip())
     except json.JSONDecodeError as e:
         logger.error(f"[Email Reader] ❌ Could not parse subject as JSON: {e}")
     return None

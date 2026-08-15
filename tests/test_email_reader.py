@@ -70,3 +70,26 @@ def test_malformed_alert_is_reported_without_leaking(app_env, tmp_path):
     reader = _boot(app_env)
     assert reader.parse_email_subject('Alert: {"PIN": "' + TEST_PIN + '", broken') is None
     assert TEST_PIN not in _log_text(tmp_path)
+
+
+def test_html_entity_subject_does_not_leak_the_pin(app_env, tmp_path):
+    """TradingView/mail clients may HTML-escape the subject. It still parses
+    as a signal, but redaction looked for a real "PIN": and missed it, so the
+    secret reached the log."""
+    reader = _boot(app_env)
+
+    parsed = reader.parse_email_subject(
+        "Alert: {&quot;PIN&quot;: &quot;" + TEST_PIN + "&quot;, "
+        "&quot;EXCHANGE&quot;: &quot;bybit&quot;}"
+    )
+
+    assert parsed["EXCHANGE"] == "bybit", "the escaped signal must still parse"
+    assert TEST_PIN not in _log_text(tmp_path)
+
+
+def test_zero_width_obfuscated_subject_does_not_leak_the_pin(app_env, tmp_path):
+    reader = _boot(app_env)
+    reader.parse_email_subject(
+        'Alert: {"P​IN": "' + TEST_PIN + '", "EXCHANGE": "bybit"}'
+    )
+    assert TEST_PIN not in _log_text(tmp_path)

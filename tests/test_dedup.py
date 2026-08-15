@@ -264,3 +264,24 @@ def test_duplicate_does_not_count_against_the_lockout(app_env, fake_exchange):
     # A correct PIN each time, so the throttle must never engage.
     assert client.post("/webhook", json=_payload(QUANTITY="0.05")).status_code == 200
     assert len(stub.calls) == 2
+
+
+def test_broken_connection_is_discarded_not_reused(tmp_path):
+    """A cached dead handle made every later check fail open, silently
+    disabling suppression for the life of the process."""
+    f = _filter(tmp_path)
+    assert f.check("a") is False          # recorded
+
+    f._connect().close()                  # simulate a dead handle
+
+    assert f.check("b") is False          # fails open, but must drop the conn
+    assert f.check("a") is True, "should have reconnected and seen the key"
+
+
+def test_forget_also_recovers_from_a_broken_connection(tmp_path):
+    f = _filter(tmp_path)
+    f.check("a")
+    f._connect().close()
+
+    f.forget("b")                         # triggers the failure path
+    assert f.check("a") is True           # reconnected, state intact
