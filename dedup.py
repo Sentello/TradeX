@@ -1,10 +1,18 @@
-"""Duplicate signal suppression.
+"""Duplicate signal suppression, shared across processes.
 
-Protects against the same order being placed twice. The realistic case is
-not an attacker but a lost response: if the connection drops after the
-exchange accepted the order but before the sender saw the reply, the sender
-cannot tell that from a genuine failure, and a retry would double the
-position.
+Protects against the same order being placed twice. Two cases matter:
+
+- A lost response. If the connection drops after the exchange accepted the
+  order but before the sender saw the reply, the sender cannot tell that
+  from a genuine failure, and a retry would double the position.
+- MODE=both. The webhook and the email reader run as separate processes,
+  and a TradingView alert configured to send both a webhook and an email
+  arrives twice, once down each path.
+
+The second case is why the store is SQLite on disk rather than a dict: an
+in-process cache cannot see what another process has already executed.
+SQLite is in the standard library, is safe for concurrent writers, and
+needs no service to run alongside.
 
 This is at-most-once within a time window, not true anti-replay. A sender
 that cannot sign its requests (TradingView cannot) offers nothing to verify
@@ -15,13 +23,29 @@ WEBHOOK_PIN are the controls for that.
 
 import hashlib
 import json
+import os
+import sqlite3
 import threading
 import time
-from collections import OrderedDict
+
+import log_setup
+
+logger = log_setup.get_logger("dedup")
 
 # Fields excluded from the fingerprint: secrets, and the caller's own
 # idempotency key which is handled separately.
 _EXCLUDED = {"pin", "id"}
+
+DB_FILENAME = "dedup.sqlite3"
+
+
+def default_db_path():
+    """Shared state lives beside the logs, which every service can write.
+
+    The dashboard's /logs endpoint only serves *.log, so this file is not
+    exposed by it.
+    """
+    return os.path.join(log_setup.log_directory(), DB_FILENAME)
 
 
 def signal_key(payload):
@@ -46,51 +70,95 @@ def signal_key(payload):
 
 
 class DuplicateFilter:
-    """Remembers recently seen signals for `window_seconds`."""
+    """Remembers recently seen signals for `window_seconds`, across processes."""
 
-    def __init__(self, window_seconds, max_tracked=4096):
+    def __init__(self, window_seconds, path=None, max_tracked=4096):
         self.window_seconds = window_seconds
+        self.path = path or default_db_path()
         self.max_tracked = max_tracked
-        self._seen = OrderedDict()  # key -> first seen timestamp
-        self._lock = threading.Lock()
+        # sqlite3 connections are not shareable between threads.
+        self._local = threading.local()
+        if self.window_seconds > 0:
+            self._init_db()
+
+    def _connect(self):
+        conn = getattr(self._local, "conn", None)
+        if conn is None:
+            directory = os.path.dirname(self.path)
+            if directory:
+                os.makedirs(directory, exist_ok=True)
+            # isolation_level=None: transactions are managed explicitly below.
+            conn = sqlite3.connect(self.path, timeout=10, isolation_level=None)
+            # WAL lets the webhook and the email reader write concurrently.
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA busy_timeout=10000")
+            self._local.conn = conn
+        return conn
+
+    def _init_db(self):
+        conn = self._connect()
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS seen ("
+            "  key TEXT PRIMARY KEY,"
+            "  ts  REAL NOT NULL"
+            ")"
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS seen_ts ON seen (ts)")
 
     def _now(self):
-        return time.monotonic()
-
-    def _expire(self, now):
-        """Drop entries older than the window. Keys are inserted in time
-        order, so stopping at the first live one is enough."""
-        cutoff = now - self.window_seconds
-        while self._seen:
-            key, seen_at = next(iter(self._seen.items()))
-            if seen_at > cutoff:
-                break
-            del self._seen[key]
+        # Wall clock, not monotonic: the value must be comparable across
+        # processes that started at different times.
+        return time.time()
 
     def check(self, key):
         """Record the key. Returns True when it was already seen in-window."""
         if self.window_seconds <= 0:
             return False
 
-        with self._lock:
-            now = self._now()
-            self._expire(now)
-
-            seen_at = self._seen.get(key)
-            if seen_at is not None and seen_at > now - self.window_seconds:
-                # Deliberately not refreshed: a run of retries should not
-                # extend the window indefinitely.
-                return True
-
-            self._seen[key] = now
-            self._seen.move_to_end(key)
-            # Enforce the cap after inserting, or the store settles one entry
-            # above max_tracked.
-            while len(self._seen) > self.max_tracked:
-                self._seen.popitem(last=False)
+        now = self._now()
+        cutoff = now - self.window_seconds
+        try:
+            conn = self._connect()
+            # IMMEDIATE takes the write lock up front, so two processes
+            # cannot both conclude they are the first to see this key.
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                conn.execute("DELETE FROM seen WHERE ts <= ?", (cutoff,))
+                cursor = conn.execute(
+                    "INSERT OR IGNORE INTO seen (key, ts) VALUES (?, ?)", (key, now)
+                )
+                duplicate = cursor.rowcount == 0
+                if not duplicate:
+                    # Keep only the newest max_tracked rows, so a flood of
+                    # unique payloads cannot grow the file without limit.
+                    conn.execute(
+                        "DELETE FROM seen WHERE key IN ("
+                        "  SELECT key FROM seen ORDER BY ts DESC LIMIT -1 OFFSET ?"
+                        ")",
+                        (self.max_tracked,),
+                    )
+                conn.execute("COMMIT")
+            except Exception:
+                conn.execute("ROLLBACK")
+                raise
+            return duplicate
+        except Exception as e:
+            # Fail open, loudly. Refusing every order because a state file is
+            # unwritable would be worse than the duplicate this prevents.
+            logger.error(f"❌ Duplicate check failed, allowing the signal through: {e}")
             return False
 
     def forget(self, key):
         """Drop a key so an equivalent signal is accepted again."""
-        with self._lock:
-            self._seen.pop(key, None)
+        if self.window_seconds <= 0:
+            return
+        try:
+            self._connect().execute("DELETE FROM seen WHERE key = ?", (key,))
+        except Exception as e:
+            logger.error(f"❌ Could not clear duplicate key {key}: {e}")
+
+    def count(self):
+        """Rows currently tracked. For tests and diagnostics."""
+        if self.window_seconds <= 0:
+            return 0
+        return self._connect().execute("SELECT COUNT(*) FROM seen").fetchone()[0]

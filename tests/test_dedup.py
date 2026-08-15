@@ -50,20 +50,25 @@ def test_explicit_id_matches_across_differing_payloads():
 
 # --- the filter ---
 
-def test_second_sighting_is_a_duplicate():
-    f = DuplicateFilter(window_seconds=60)
+def _filter(tmp_path, **kwargs):
+    kwargs.setdefault("window_seconds", 60)
+    return DuplicateFilter(path=str(tmp_path / "dedup.sqlite3"), **kwargs)
+
+
+def test_second_sighting_is_a_duplicate(tmp_path):
+    f = _filter(tmp_path)
     assert f.check("k") is False
     assert f.check("k") is True
 
 
-def test_distinct_keys_do_not_collide():
-    f = DuplicateFilter(window_seconds=60)
+def test_distinct_keys_do_not_collide(tmp_path):
+    f = _filter(tmp_path)
     assert f.check("a") is False
     assert f.check("b") is False
 
 
-def test_window_expiry_allows_the_signal_again(monkeypatch):
-    f = DuplicateFilter(window_seconds=60)
+def test_window_expiry_allows_the_signal_again(tmp_path, monkeypatch):
+    f = _filter(tmp_path)
     clock = [1000.0]
     monkeypatch.setattr(f, "_now", lambda: clock[0])
 
@@ -74,9 +79,9 @@ def test_window_expiry_allows_the_signal_again(monkeypatch):
     assert f.check("k") is False
 
 
-def test_retries_do_not_extend_the_window(monkeypatch):
+def test_retries_do_not_extend_the_window(tmp_path, monkeypatch):
     """Otherwise a run of retries could suppress a later genuine signal."""
-    f = DuplicateFilter(window_seconds=60)
+    f = _filter(tmp_path)
     clock = [1000.0]
     monkeypatch.setattr(f, "_now", lambda: clock[0])
 
@@ -88,24 +93,81 @@ def test_retries_do_not_extend_the_window(monkeypatch):
     assert f.check("k") is False
 
 
-def test_zero_window_disables_suppression():
-    f = DuplicateFilter(window_seconds=0)
+def test_zero_window_disables_suppression(tmp_path):
+    f = _filter(tmp_path, window_seconds=0)
     assert f.check("k") is False
     assert f.check("k") is False
 
 
-def test_forget_allows_immediate_resend():
-    f = DuplicateFilter(window_seconds=60)
+def test_forget_allows_immediate_resend(tmp_path):
+    f = _filter(tmp_path)
     f.check("k")
     f.forget("k")
     assert f.check("k") is False
 
 
-def test_tracking_is_bounded():
-    f = DuplicateFilter(window_seconds=3600, max_tracked=10)
+def test_tracking_is_bounded(tmp_path):
+    f = _filter(tmp_path, window_seconds=3600, max_tracked=10)
     for i in range(500):
         f.check(f"key-{i}")
-    assert len(f._seen) <= 10
+    assert f.count() <= 10
+
+
+# --- shared across processes ---
+
+def test_separate_instances_share_state(tmp_path):
+    """MODE=both runs the webhook and the email reader as separate
+    processes. An in-process cache cannot see what the other already
+    executed, so the same alert delivered down both paths traded twice."""
+    webhook = _filter(tmp_path)
+    email = _filter(tmp_path)
+
+    assert webhook.check("shared-key") is False
+    assert email.check("shared-key") is True, "the other process already ran this"
+
+
+def test_forget_is_visible_to_the_other_process(tmp_path):
+    webhook = _filter(tmp_path)
+    email = _filter(tmp_path)
+
+    webhook.check("k")
+    webhook.forget("k")
+    assert email.check("k") is False
+
+
+def test_survives_a_restart(tmp_path):
+    """State outlives the process, so a crash-and-restart cannot replay."""
+    first = _filter(tmp_path)
+    first.check("k")
+    del first
+
+    assert _filter(tmp_path).check("k") is True
+
+
+def test_concurrent_writers_agree_on_a_single_winner(tmp_path):
+    """Under real concurrency exactly one caller may see a given key as new."""
+    import threading
+
+    path = str(tmp_path / "dedup.sqlite3")
+    results = []
+    lock = threading.Lock()
+    barrier = threading.Barrier(8)
+
+    def worker():
+        f = DuplicateFilter(window_seconds=60, path=path)
+        barrier.wait()
+        outcome = f.check("contended")
+        with lock:
+            results.append(outcome)
+
+    threads = [threading.Thread(target=worker) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert results.count(False) == 1, f"exactly one winner expected, got {results}"
+    assert results.count(True) == 7
 
 
 # --- webhook integration ---

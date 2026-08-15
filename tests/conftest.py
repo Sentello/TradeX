@@ -39,9 +39,11 @@ BASE_ENV = {
 # Modules that hold module-level state derived from config, in import order.
 RELOAD_ORDER = [
     "config",
+    "serve",
     "exchanges",
     "signal_handler",
     "bot_logic",
+    "email_reader",
     "webhook_receiver",
     "dashboard_app",
 ]

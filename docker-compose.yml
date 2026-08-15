@@ -8,10 +8,16 @@ services:
     env_file:
       - .env
     ports:
-      # The dashboard has no TLS. Prefer "127.0.0.1:5000:5000" and reach it
-      # through a reverse proxy or an SSH tunnel rather than exposing it.
-      - "5000:5000"  # Dashboard
-      - "5005:5005"  # Webhook
+      # Dashboard: localhost only. It serves no TLS, and it can close every
+      # open position, so publishing it on all interfaces would put an
+      # unencrypted login on the public network. Reach it over an SSH tunnel
+      #   ssh -L 5000:127.0.0.1:5000 you@server
+      # or put a TLS-terminating reverse proxy in front and set
+      # SESSION_COOKIE_SECURE=true. Change to "5000:5000" only if you
+      # understand that trade-off.
+      - "127.0.0.1:5000:5000"
+      # Webhook: must stay reachable, TradingView has to POST to it.
+      - "5005:5005"
     #volumes:
       #- .:/app
       #- ./logs:/var/log

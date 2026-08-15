@@ -16,7 +16,7 @@ from email.header import decode_header, make_header  # noqa: E402
 
 import config  # noqa: E402
 from dedup import DuplicateFilter, signal_key  # noqa: E402
-from log_setup import redact  # noqa: E402
+from log_setup import redact, redact_text  # noqa: E402
 from signal_handler import process_signal  # noqa: E402
 
 logger = log_setup.get_logger("email_reader")
@@ -45,7 +45,11 @@ def decode_subject(msg):
 
 def parse_email_subject(subject):
     """Extracts and parses JSON data from the email subject."""
-    logger.info(f"[Email Reader] 📩 Checking email with subject: {subject[:80]}")
+    # Redact before truncating: an alert subject is the raw JSON including
+    # the PIN, and the dashboard serves these log files over /logs.
+    logger.info(
+        f"[Email Reader] 📩 Checking email with subject: {redact_text(subject)[:80]}"
+    )
 
     if not subject.startswith("Alert:"):
         return None

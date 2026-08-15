@@ -11,6 +11,7 @@ logs; library modules just call get_logger(__name__).
 
 import logging
 import os
+import re
 from logging.handlers import RotatingFileHandler
 
 ROOT_LOGGER_NAME = "tradex"
@@ -70,6 +71,26 @@ def get_logger(name):
     if not _configured:
         configure(os.getenv("TRADEX_SERVICE", ROOT_LOGGER_NAME))
     return logging.getLogger(f"{ROOT_LOGGER_NAME}.{name}")
+
+
+# Secrets embedded in free text, e.g. an email subject carrying the raw
+# alert JSON. Matches both "PIN": "abc" and "PIN": 778899.
+_SECRET_TEXT_RE = re.compile(
+    r"""(["']?\b(?:pin|password|passwd|secret|api_?key|token)\b["']?\s*[:=]\s*)"""
+    r"""(["'][^"']*["']|[^\s,}\]]+)""",
+    re.IGNORECASE,
+)
+
+
+def redact_text(text):
+    """Mask secret values inside an arbitrary string.
+
+    For text that has not been parsed into a dict yet. Redact before
+    truncating, or a shortened line can still expose the value.
+    """
+    if not text:
+        return text
+    return _SECRET_TEXT_RE.sub(lambda m: m.group(1) + '"***"', str(text))
 
 
 def redact(payload):

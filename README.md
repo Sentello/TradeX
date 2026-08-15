@@ -125,11 +125,13 @@ A trader uses **TradingView webhooks** for real-time signals during active tradi
 When running in **Dual Mode**, it’s important to configure your TradingView alerts carefully to avoid duplicate signal processing:
 - **Tick "Send Email" Only**: Use this for signals that don't require instant execution but need guaranteed delivery.
 - **Tick "Webhook URL" Only**: Use this for signals that require fast execution.
-- **Avoid Ticking Both Boxes**: If both options are selected, the same signal will be sent twice—once via webhook and once via email. This could result in duplicate orders being placed.
+- **Ticking Both Boxes**: the same signal is delivered twice, once by webhook and once by email. TradeX suppresses the second one — the two services share a duplicate store on disk, so whichever path arrives first places the order and the other is ignored. See [Duplicate signals](#duplicate-signals).
 
   ![image](https://github.com/user-attachments/assets/6d3f4a4f-dde8-42ee-b853-f4d8b5801bea)
 
-TradeX does not currently include a deduplication mechanism, so it’s up to the user to configure TradingView alerts appropriately. For example:
+Suppression is bounded by `WEBHOOK_DEDUP_SECONDS` (60 by default), so it
+covers near-simultaneous delivery down both paths, not an email that arrives
+an hour late. Splitting signals by channel remains a reasonable approach:
 - High-priority signals (e.g., scalping strategies) can be sent via webhook for fast execution.
 - Lower-priority signals (e.g., long-term position adjustments) can be sent via email for guaranteed delivery.
 
@@ -331,6 +333,12 @@ ignores an identical signal repeated within `WEBHOOK_DEDUP_SECONDS`
 {"status": "duplicate", "message": "Identical signal already accepted; no order placed."}
 ```
 
+The store is a small SQLite file next to the logs, shared by the webhook and
+the email reader. That is what makes `MODE=both` safe: the two run as
+separate processes, and an in-memory cache could not see what the other had
+already executed. It also survives a restart, so a crash cannot replay a
+signal.
+
 Two signals count as identical when every field except `PIN` matches. **If
 your strategy can legitimately fire the same order twice in quick
 succession, add a unique `ID` field to the alert** — when `ID` is present it
@@ -364,10 +372,30 @@ for that.
 
 | Variable | Default | Description |
 |---|---|---|
-| `DASHBOARD_HOST` | `0.0.0.0` | Dashboard bind address. |
+| `DASHBOARD_HOST` | `0.0.0.0` | Dashboard bind address. Set `127.0.0.1` for a local (non-Docker) run to keep it off the network. |
 | `DASHBOARD_PORT` | `5000` | Dashboard port. |
 | `WEBHOOK_HOST` | `0.0.0.0` | Webhook bind address. |
 | `WEBHOOK_PORT` | `5005` | Webhook port. |
+
+These are read by `serve.py`, which both `main.py` and `supervisord.conf`
+use to start the services — so changing them takes effect without editing
+any service file.
+
+**Under Docker these control the bind address *inside* the container**,
+which must stay `0.0.0.0` for port publishing to work. What reaches your
+network is decided by the `ports:` list in `docker-compose.yml`, where the
+dashboard is published to `127.0.0.1` only:
+
+```yaml
+ports:
+  - "127.0.0.1:5000:5000"   # dashboard: localhost only
+  - "5005:5005"             # webhook: must be reachable by TradingView
+```
+
+The dashboard serves no TLS and can close every open position, so it is kept
+off the public network by default. Reach it over an SSH tunnel
+(`ssh -L 5000:127.0.0.1:5000 you@server`), or put a TLS-terminating reverse
+proxy in front and set `SESSION_COOKIE_SECURE=true`.
 
 ---
 

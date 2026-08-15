@@ -111,7 +111,7 @@ After=network.target
 User=your_user  # Replace with your username (e.g., "ubuntu" or "root")
 Group=www-data  # Replace with your group (optional)
 WorkingDirectory=/path/to/tradex  # Replace with the absolute path to your project directory
-ExecStart=/path/to/venv/bin/gunicorn -w 4 -b 0.0.0.0:5000 dashboard_app:app
+ExecStart=/path/to/venv/bin/python /path/to/tradex/serve.py dashboard
 Restart=always
 Environment="PATH=/path/to/venv/bin"  # Replace with the path to your virtual environment's bin folder
 EnvironmentFile=/path/to/tradex/.env  # Optional: Load environment variables from .env
@@ -136,7 +136,7 @@ After=network.target
 User=your_user  # Replace with your username
 Group=www-data  # Replace with your group (optional)
 WorkingDirectory=/path/to/tradex  # Replace with the absolute path to your project directory
-ExecStart=/path/to/venv/bin/gunicorn -w 2 -b 0.0.0.0:5005 webhook_receiver:app
+ExecStart=/path/to/venv/bin/python /path/to/tradex/serve.py webhook
 Restart=always
 Environment="PATH=/path/to/venv/bin"  # Replace with the path to your virtual environment's bin folder
 EnvironmentFile=/path/to/tradex/.env  # Optional: Load environment variables from .env
@@ -213,7 +213,7 @@ sudo systemctl stop webhook_app
   - Verify that the `.env` file exists and contains valid configuration.
 
 - **Port Conflicts**:
-  - If ports `5000` or `5005` are already in use, update the `ExecStart` commands in the `.service` files or the `command` fields in the `supervisord.conf` file to use different ports.
+  - If ports `5000` or `5005` are already in use, set `DASHBOARD_PORT` / `WEBHOOK_PORT` in `.env`. `serve.py` reads them, so the service files do not need editing.
 
 - **Gunicorn Not Found**:
   - Ensure Gunicorn is installed in your virtual environment. Run:

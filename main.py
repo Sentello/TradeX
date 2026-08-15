@@ -1,13 +1,13 @@
 """Local (non-Docker) entry point. The container uses supervisord instead."""
 
 import logging
-import os
 import signal
 import subprocess
 import sys
 import threading
 
 import config
+import serve
 from email_reader import run_email_reader
 
 logging.basicConfig(level=logging.INFO)
@@ -30,17 +30,11 @@ signal.signal(signal.SIGINT, handle_exit_signal)
 signal.signal(signal.SIGTERM, handle_exit_signal)
 
 
-def start_gunicorn(service_name, port):
+def start_gunicorn(service):
     """Start Gunicorn for a given service (dashboard or webhook)."""
-    logging.info(f"Starting {service_name} on port {port}...")
-    env = dict(os.environ, TRADEX_SERVICE=service_name)
-    # One worker: the login lockout counter is in-process, and a second worker
-    # would duplicate the ccxt clients and race on the log files.
-    proc = subprocess.Popen(
-        ["gunicorn", "-w", "1", "-b", f"0.0.0.0:{port}", f"{service_name}:app"],
-        env=env,
-    )
-    processes.append(proc)
+    command = serve.build_command(service)
+    logging.info(f"Starting {service}: {' '.join(command)}")
+    processes.append(subprocess.Popen(command, env=serve.environment(service)))
 
 
 def start_email_reader():
@@ -54,13 +48,13 @@ def start_email_reader():
 if __name__ == "__main__":
     # MODE is validated in config, so no second check is needed here.
     if config.WEBHOOK_ENABLED:
-        start_gunicorn("webhook_receiver", config.WEBHOOK_PORT)
+        start_gunicorn("webhook")
 
     if config.EMAIL_ENABLED:
         start_email_reader()
 
     # Always start the dashboard
-    start_gunicorn("dashboard_app", config.DASHBOARD_PORT)
+    start_gunicorn("dashboard")
 
     # Wait for Gunicorn processes to finish
     for proc in processes:
