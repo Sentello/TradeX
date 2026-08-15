@@ -12,6 +12,7 @@ from functools import wraps  # noqa: E402
 import bcrypt  # noqa: E402
 from flask import (  # noqa: E402
     Flask,
+    flash,
     jsonify,
     redirect,
     render_template,
@@ -207,6 +208,17 @@ def summary_stats():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+def _flash_failed(result, fallback):
+    """Surface a bot_logic error dict; a missing message still gets fallback."""
+    if isinstance(result, dict) and result.get("status") == "success":
+        return False
+    message = fallback
+    if isinstance(result, dict) and result.get("message"):
+        message = result["message"]
+    flash(message, "danger")
+    return True
+
+
 # Close a Specific Position
 @app.route("/close_position", methods=["POST"])
 @login_required
@@ -216,9 +228,13 @@ def close_position_route():
         exchange_name = request.form["EXCHANGE"]
         symbol = request.form["SYMBOL"]
         result = close_position(exchange_name, symbol)
-        logger.info(f"Closed position for {symbol} on {exchange_name}: {result}")
+        if _flash_failed(result, f"Failed to close {symbol}."):
+            logger.warning(f"Close {symbol} on {exchange_name} did not succeed: {result}")
+        else:
+            logger.info(f"Closed position for {symbol} on {exchange_name}: {result}")
     except Exception as e:
         logger.error(f"Error closing position: {e}")
+        flash(str(e), "danger")
     return redirect(url_for("index"))
 
 
@@ -228,10 +244,21 @@ def close_position_route():
 @csrf_protect
 def close_all_positions_route():
     try:
-        close_all_positions()
-        logger.info("Closed all positions.")
+        results = close_all_positions()
+        failures = []
+        for symbol, result in (results or {}).items():
+            if isinstance(result, dict) and result.get("status") == "success":
+                continue
+            detail = result.get("message") if isinstance(result, dict) else "failed"
+            failures.append(f"{symbol}: {detail}")
+        if failures:
+            flash("Could not close: " + "; ".join(failures), "danger")
+            logger.warning(f"Close-all had failures: {failures}")
+        else:
+            logger.info(f"Closed all positions: {results}")
     except Exception as e:
         logger.error(f"Error closing all positions: {e}")
+        flash(str(e), "danger")
     return redirect(url_for("index"))
 
 
@@ -244,10 +271,14 @@ def cancel_order_route():
         exchange_name = request.form["EXCHANGE"]
         order_id = request.form["ORDER_ID"]
         symbol = request.form["SYMBOL"]
-        cancel_order(exchange_name, order_id, symbol)
-        logger.info(f"Canceled order {order_id} on {exchange_name}")
+        result = cancel_order(exchange_name, order_id, symbol)
+        if _flash_failed(result, f"Failed to cancel order {order_id}."):
+            logger.warning(f"Cancel {order_id} on {exchange_name} did not succeed: {result}")
+        else:
+            logger.info(f"Canceled order {order_id} on {exchange_name}")
     except Exception as e:
         logger.error(f"Error canceling order: {e}")
+        flash(str(e), "danger")
     return redirect(url_for("index"))
 
 

@@ -13,6 +13,12 @@
     <div class="container-fluid mt-4">
         <h1 class="text-center text-success mb-4">💰 TradeX Bot Dashboard</h1>
 
+        {% with messages = get_flashed_messages(with_categories=True) %}
+        {% for category, message in messages %}
+        <div class="alert alert-{{ category }} text-center" role="alert">{{ message }}</div>
+        {% endfor %}
+        {% endwith %}
+
         {% if error %}
         <div class="alert alert-danger text-center" role="alert">
             <strong>Error:</strong> {{ error }}

@@ -72,6 +72,68 @@ def test_post_succeeds_with_csrf_token(app_env):
     assert response.status_code == 302
 
 
+def _logged_in(app_env):
+    dashboard, client = _boot(app_env)
+    client.post("/login", data={"password": TEST_PASSWORD})
+    with client.session_transaction() as sess:
+        token = sess["csrf_token"]
+    return dashboard, client, token
+
+
+def test_failed_close_is_shown_on_the_dashboard(app_env):
+    dashboard, client, token = _logged_in(app_env)
+    dashboard.close_position = lambda *a, **k: {
+        "status": "error",
+        "message": "reduceOnly rejected",
+    }
+
+    response = client.post(
+        "/close_position",
+        data={"csrf_token": token, "EXCHANGE": "bybit", "SYMBOL": "BTC/USDT:USDT"},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert b"reduceOnly rejected" in response.data
+
+
+def test_failed_cancel_is_shown_on_the_dashboard(app_env):
+    dashboard, client, token = _logged_in(app_env)
+    dashboard.cancel_order = lambda *a, **k: {
+        "status": "error",
+        "message": "order already filled",
+    }
+
+    response = client.post(
+        "/cancel_order",
+        data={
+            "csrf_token": token,
+            "EXCHANGE": "bybit",
+            "ORDER_ID": "1",
+            "SYMBOL": "BTC/USDT:USDT",
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert b"order already filled" in response.data
+
+
+def test_close_all_surfaces_partial_failures(app_env):
+    dashboard, client, token = _logged_in(app_env)
+    dashboard.close_all_positions = lambda: {
+        "BTC/USDT:USDT": {"status": "success", "order": {}},
+        "ETH/USDT:USDT": {"status": "error", "message": "reduceOnly rejected"},
+    }
+
+    response = client.post(
+        "/close_all_positions",
+        data={"csrf_token": token},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert b"ETH/USDT:USDT: reduceOnly rejected" in response.data
+    assert b"BTC/USDT:USDT" not in response.data
+
+
 def test_logs_endpoint_is_tailed(app_env, tmp_path):
     dashboard, client = _boot(app_env)
     client.post("/login", data={"password": TEST_PASSWORD})
