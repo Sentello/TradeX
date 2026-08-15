@@ -274,11 +274,50 @@ back to an insecure default. Generate all three with
 
 | Variable | Default | Description |
 |---|---|---|
-| `WEBHOOK_ALLOWED_IPS` | *(empty — any address)* | Comma-separated IPs or CIDR blocks allowed to reach `/webhook`. Off by default. Only practical when the sender's addresses are stable — see the caveat under [Security Best Practices](#security-best-practices). |
+| `WEBHOOK_ALLOWED_IPS` | *(empty — any address)* | Comma-separated IPs or CIDR blocks allowed to reach `/webhook`. **Off by default.** See [Restricting webhook sources](#restricting-webhook-sources-optional). |
 | `WEBHOOK_MAX_FAILURES` | `5` | Bad PINs from one address before it is locked out. |
 | `WEBHOOK_LOCKOUT_SECONDS` | `300` | How long that lockout lasts. Applied per source IP, never endpoint-wide, so an attacker cannot stop your real alerts by sending junk. |
 | `WEBHOOK_DEDUP_SECONDS` | `60` | Ignore an identical signal repeated within this window, so a lost response cannot become a doubled position. See [Duplicate signals](#duplicate-signals). Set to `0` to disable. |
 | `TRUST_PROXY_HEADERS` | `false` | Read the client address from `X-Forwarded-For`. **Only enable behind a reverse proxy that overwrites the header** — if the app is directly exposed, a client can forge it and bypass both the allowlist and the lockout. |
+
+### Restricting webhook sources (optional)
+
+`WEBHOOK_ALLOWED_IPS` limits `/webhook` to a set of addresses. **It is off
+by default** so a fresh clone works immediately — enabling it is your
+decision, and you own the consequences either way.
+
+TradingView [publishes the source IPs it sends webhooks from][tv-webhooks]:
+
+```
+52.89.214.238
+34.212.75.30
+54.218.53.128
+52.32.178.7
+```
+
+To allow only those, uncomment this line in `.env` and restart:
+
+```bash
+WEBHOOK_ALLOWED_IPS=52.89.214.238,34.212.75.30,54.218.53.128,52.32.178.7
+```
+
+CIDR blocks work too (`WEBHOOK_ALLOWED_IPS=10.0.0.0/24,203.0.113.7`), which
+is the better fit when signals reach you through a proxy or VPS you control.
+
+**Understand the trade-off before turning it on.** With an allowlist,
+guessing the PIN stops being a viable attack at all. But TradingView does
+not contractually guarantee those addresses — if they change and your list
+is stale, real trade signals are rejected with a `403` and you will not
+notice until you read `logs/webhook.log`. A missed entry can cost more than
+the risk it removes. Verify the list against the link above before enabling,
+and check it again if signals stop arriving.
+
+Leaving it off is a reasonable choice. The per-IP lockout
+(`WEBHOOK_MAX_FAILURES`) still applies either way, and a long random
+`WEBHOOK_PIN` is the control that works regardless of where signals come
+from.
+
+[tv-webhooks]: https://www.tradingview.com/support/solutions/43000529348-how-to-configure-webhook-alerts/
 
 ### Duplicate signals
 
@@ -502,7 +541,7 @@ For further assistance, check the logs in the `logs/` directory. Each service wr
 
 ## Security Best Practices
 
-- **Restricting who can reach the webhook** with `WEBHOOK_ALLOWED_IPS` removes brute-forcing the PIN as a possibility rather than merely slowing it down — but **only adopt it if your sender's addresses are stable**. TradingView does not guarantee its webhook source IPs, and a stale entry rejects real trade signals with a `403` that looks like nothing at all until you read the logs. Left off by default for that reason. It is a good fit when signals arrive via a proxy or VPS you control.
+- **Consider restricting webhook sources**: `WEBHOOK_ALLOWED_IPS` removes brute-forcing the PIN as a possibility rather than merely slowing it down. Off by default, with the trade-off explained in [Restricting webhook sources](#restricting-webhook-sources-optional) — a stale address list silently rejects real signals, so it is your call whether the exchange is worth it.
 - **Use a long, random `WEBHOOK_PIN`**: it is the only credential on an endpoint that places real orders. A 6-digit numeric PIN is a keyspace of 1,000,000 — crackable in about an hour at 100 requests/second. `python generate_credentials.py` produces a 43-character one.
 - **Never reuse the PIN as the dashboard password**: the PIN travels in plaintext inside alert bodies and across mail servers.
 - **Restrict access to the dashboard**: bind it to `127.0.0.1` or use a firewall. It has no TLS of its own, so the password and session cookie cross the network in cleartext unless you put it behind a reverse proxy.

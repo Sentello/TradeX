@@ -171,3 +171,30 @@ def test_forwarded_header_is_used_when_trusted(app_env, fake_exchange):
 
     assert response.status_code == 200
     assert len(stub.calls) == 1
+
+
+# --- shipped defaults ---
+
+TRADINGVIEW_IPS = ["52.89.214.238", "34.212.75.30", "54.218.53.128", "52.32.178.7"]
+
+
+def test_env_example_ships_the_allowlist_disabled():
+    """A fresh clone must accept signals from anywhere, or a new user's bot
+    silently drops every alert."""
+    from dotenv import dotenv_values
+
+    assert dotenv_values(".env.example").get("WEBHOOK_ALLOWED_IPS") in (None, "")
+
+
+def test_documented_tradingview_ips_are_usable():
+    """Guards against a typo in the list users are told to copy."""
+    line = next(
+        l for l in open(".env.example", encoding="utf-8")
+        if l.strip().startswith("# WEBHOOK_ALLOWED_IPS=")
+    )
+    networks = parse_networks(line.split("=", 1)[1].strip())
+
+    assert len(networks) == len(TRADINGVIEW_IPS)
+    for ip in TRADINGVIEW_IPS:
+        assert ip_allowed(ip, networks), f"{ip} should be permitted"
+    assert not ip_allowed("9.9.9.9", networks)
