@@ -46,6 +46,24 @@ i.bi {
    unaffected by anything below.
    ========================================= */
 
+/* This page does not load Bootstrap, so it does not get Bootstrap's reset
+   either. Without border-box, width:100% on the input has its padding and
+   border added on top and it overflows the card. */
+.login-page,
+.login-page *,
+.login-page *::before,
+.login-page *::after {
+    box-sizing: border-box;
+}
+
+/* Form controls do not inherit the page font from the UA stylesheet, so
+   without this the input and buttons render in the browser default face. */
+.login-page input,
+.login-page button {
+    font-family: inherit;
+    line-height: inherit;
+}
+
 .login-page {
     --accent: #2ea043;
     --accent-bright: #3fb950;
@@ -56,6 +74,11 @@ i.bi {
     /* This page no longer loads Bootstrap, so tell the browser to render
        native form controls (autofill, the built-in reveal icon) dark. */
     color-scheme: dark;
+
+    /* Also Bootstrap's job previously: clear the UA's default body margin. */
+    margin: 0;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
 
     min-height: 100vh;
     min-height: 100dvh;
@@ -249,7 +272,7 @@ i.bi {
 }
 
 .login-footer {
-    margin-top: 1.75rem;
+    margin: 1.75rem 0 0;
     font-size: 0.8rem;
     text-align: center;
     color: var(--text-muted);
