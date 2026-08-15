@@ -84,6 +84,26 @@ if len(WEBHOOK_PIN) < MIN_PIN_LENGTH:
         f"credential on the trading endpoint; use at least {MIN_PIN_LENGTH} "
         f"random characters."
     )
+if WEBHOOK_PIN.isdigit():
+    _startup_log.warning(
+        f"⚠ WEBHOOK_PIN is digits only, a keyspace of just 10^{len(WEBHOOK_PIN)}. "
+        f"Regenerate it with: python generate_credentials.py"
+    )
+
+# Source addresses permitted to reach /webhook. Empty means "any address".
+# TradingView publishes a small set of webhook source IPs; restricting to
+# them removes brute force as a concern entirely.
+WEBHOOK_ALLOWED_IPS = _optional("WEBHOOK_ALLOWED_IPS", "")
+
+# Per-IP lockout after repeated bad PINs. Not endpoint-wide: a global lock
+# would let anyone disable trading by sending a handful of bad requests.
+WEBHOOK_MAX_FAILURES = _int("WEBHOOK_MAX_FAILURES", 5)
+WEBHOOK_LOCKOUT_SECONDS = _int("WEBHOOK_LOCKOUT_SECONDS", 300)
+
+# Only enable behind a reverse proxy that overwrites X-Forwarded-For.
+# Trusting it when directly exposed lets a client forge its own address and
+# walk straight past the allowlist and the lockout.
+TRUST_PROXY_HEADERS = _bool("TRUST_PROXY_HEADERS", False)
 
 # Bybit / Binance credentials
 BYBIT_API_KEY = _optional("BYBIT_API_KEY", "")

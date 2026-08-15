@@ -6,7 +6,6 @@ log_setup.configure("dashboard")
 import hmac  # noqa: E402
 import os  # noqa: E402
 import secrets  # noqa: E402
-import time  # noqa: E402
 from collections import deque  # noqa: E402
 from functools import wraps  # noqa: E402
 
@@ -30,6 +29,7 @@ from bot_logic import (  # noqa: E402
     get_pending_orders,
     get_positions,
 )
+from ratelimit import FailureThrottle  # noqa: E402
 
 logger = log_setup.get_logger("dashboard")
 log_directory = log_setup.log_directory()
@@ -52,30 +52,17 @@ app.config.update(
 
 # Failed logins per client address. Single gunicorn worker, so this is shared
 # across all requests in the process.
-_failed_logins = {}
+_login_throttle = FailureThrottle(
+    config.LOGIN_MAX_ATTEMPTS, config.LOGIN_LOCKOUT_SECONDS
+)
 
 
 def _client_id():
+    if config.TRUST_PROXY_HEADERS:
+        forwarded = request.headers.get("X-Forwarded-For", "")
+        if forwarded:
+            return forwarded.split(",")[0].strip()
     return request.remote_addr or "unknown"
-
-
-def _is_locked_out(client):
-    attempts, locked_until = _failed_logins.get(client, (0, 0.0))
-    if locked_until and time.time() < locked_until:
-        return True
-    if locked_until and time.time() >= locked_until:
-        _failed_logins.pop(client, None)
-    return False
-
-
-def _record_failure(client):
-    attempts, _ = _failed_logins.get(client, (0, 0.0))
-    attempts += 1
-    locked_until = 0.0
-    if attempts >= config.LOGIN_MAX_ATTEMPTS:
-        locked_until = time.time() + config.LOGIN_LOCKOUT_SECONDS
-        logger.warning(f"🔒 Locking out {client} after {attempts} failed logins.")
-    _failed_logins[client] = (attempts, locked_until)
 
 
 def _password_matches(password):
@@ -126,14 +113,16 @@ def csrf_protect(func):
 def login():
     if request.method == "POST":
         client = _client_id()
-        if _is_locked_out(client):
+        locked = _login_throttle.blocked_for(client)
+        if locked:
             logger.warning(f"Login attempt from locked-out client {client}.")
             return render_template(
-                "login.html", error="Too many failed attempts. Try again later."
+                "login.html",
+                error=f"Too many failed attempts. Try again in {int(locked / 60) + 1} minute(s).",
             ), 429
 
         if _password_matches(request.form.get("password")):
-            _failed_logins.pop(client, None)
+            _login_throttle.reset(client)
             # New session identifier on privilege change.
             session.clear()
             session["logged_in"] = True
@@ -142,8 +131,11 @@ def login():
             logger.info(f"User logged in successfully from {client}.")
             return redirect(url_for("index"))
 
-        _record_failure(client)
-        logger.warning(f"Invalid login attempt from {client}.")
+        locked = _login_throttle.record_failure(client)
+        logger.warning(
+            f"Invalid login attempt from {client}."
+            + (f" Locked out for {locked:.0f}s." if locked else "")
+        )
         return render_template("login.html", error="Invalid password"), 401
     return render_template("login.html")
 
