@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="csrf-token" content="{{ csrf_token }}" />
     <title>TradeX Bot Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
@@ -108,6 +109,7 @@
 
         <div class="text-center mb-4">
             <form method="POST" action="/close_all_positions" onsubmit="return confirm('Close all open positions?')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <button type="submit" class="btn btn-warning btn-lg"><i class="bi bi-x-circle"></i> Close All Open Positions</button>
             </form>
         </div>
@@ -118,6 +120,20 @@
     </footer>
 
     <script>
+        const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]').content;
+
+        // Values below come from the exchange API, so escape before injecting.
+        function esc(value) {
+            if (value === null || value === undefined) return '';
+            return String(value).replace(/[&<>"']/g, c => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[c]));
+        }
+
+        function num(value, digits) {
+            return typeof value === 'number' ? value.toFixed(digits) : 'N/A';
+        }
+
         // Fetch and display positions
         async function fetchPositions() {
             try {
@@ -125,37 +141,38 @@
                 const positionsData = await response.json();
 
                 const positionsBody = document.querySelector('#positions-body');
-                positionsBody.innerHTML = ''; // Clear the table
+                const rows = [];
 
                 for (const exchange in positionsData) {
                     const positions = positionsData[exchange];
 
                     positions.forEach(position => {
                         const pnlClass = position.unrealized_pnl >= 0 ? 'text-success' : 'text-danger';
-                        const row = `
+                        rows.push(`
                             <tr>
-                                <td>${position.symbol}</td>
-                                <td>${position.side}</td>
-                                <td>${position.contracts}</td>
-                                <td>${position.notional.toFixed(2)}</td>
-                                <td>${position.entry_price.toFixed(4)}</td>
-                                <td>${position.liquidation_price === null ? 'N/A' : position.liquidation_price}</td>
-                                <td>${position.margin_ratio ? position.margin_ratio.toFixed(2) : 'N/A'}</td>
-                                <td>${position.leverage || 'N/A'}</td>
-                                <td class="${pnlClass}">${position.unrealized_pnl.toFixed(2)}</td>
-                                <td>${position.exchange}</td>
+                                <td>${esc(position.symbol)}</td>
+                                <td>${esc(position.side)}</td>
+                                <td>${esc(position.contracts)}</td>
+                                <td>${num(position.notional, 2)}</td>
+                                <td>${num(position.entry_price, 4)}</td>
+                                <td>${position.liquidation_price === null ? 'N/A' : esc(position.liquidation_price)}</td>
+                                <td>${num(position.margin_ratio, 4)}</td>
+                                <td>${esc(position.leverage) || 'N/A'}</td>
+                                <td class="${pnlClass}">${num(position.unrealized_pnl, 2)}</td>
+                                <td>${esc(position.exchange)}</td>
                                 <td>
-                                    <form method="POST" action="/close_position" onsubmit="return confirm('Close position for ${position.symbol}?')">
-                                        <input type="hidden" name="EXCHANGE" value="${position.exchange}">
-                                        <input type="hidden" name="SYMBOL" value="${position.symbol}">
+                                    <form method="POST" action="/close_position" onsubmit="return confirm('Close position for ${esc(position.symbol)}?')">
+                                        <input type="hidden" name="csrf_token" value="${esc(CSRF_TOKEN)}">
+                                        <input type="hidden" name="EXCHANGE" value="${esc(position.exchange)}">
+                                        <input type="hidden" name="SYMBOL" value="${esc(position.symbol)}">
                                         <button type="submit" class="btn btn-danger btn-sm"><i class="bi bi-x-lg"></i> Close</button>
                                     </form>
                                 </td>
                             </tr>
-                        `;
-                        positionsBody.innerHTML += row;
+                        `);
                     });
                 }
+                positionsBody.innerHTML = rows.join('');
             } catch (error) {
                 console.error('Error fetching positions:', error.message);
             }
@@ -168,33 +185,35 @@
                 const pendingOrdersData = await response.json();
 
                 const pendingOrdersBody = document.querySelector('#pending-orders-body');
-                pendingOrdersBody.innerHTML = ''; // Clear the table
+                const rows = [];
 
                 for (const exchange in pendingOrdersData) {
                     const orders = pendingOrdersData[exchange];
 
                     orders.forEach(order => {
-                        const row = `
+                        const quantity = order.amount || (order.info && order.info.qty) || 'N/A';
+                        rows.push(`
                             <tr>
-                                <td>${order.symbol}</td>
-                                <td>${order.type}</td>
-                                <td>${order.side}</td>
-                                <td>${order.price !== null ? order.price : (order.triggerPrice || 'N/A')}</td>
-                                <td>${order.amount || order.info.qty || 'N/A'}</td>
-                                <td>${exchange}</td>
+                                <td>${esc(order.symbol)}</td>
+                                <td>${esc(order.type)}</td>
+                                <td>${esc(order.side)}</td>
+                                <td>${esc(order.price !== null ? order.price : (order.triggerPrice || 'N/A'))}</td>
+                                <td>${esc(quantity)}</td>
+                                <td>${esc(exchange)}</td>
                                 <td>
                                     <form action="/cancel_order" method="POST">
-                                        <input type="hidden" name="EXCHANGE" value="${exchange}">
-                                        <input type="hidden" name="ORDER_ID" value="${order.id}">
-                                        <input type="hidden" name="SYMBOL" value="${order.symbol}">
+                                        <input type="hidden" name="csrf_token" value="${esc(CSRF_TOKEN)}">
+                                        <input type="hidden" name="EXCHANGE" value="${esc(exchange)}">
+                                        <input type="hidden" name="ORDER_ID" value="${esc(order.id)}">
+                                        <input type="hidden" name="SYMBOL" value="${esc(order.symbol)}">
                                         <button type="submit" class="btn btn-danger btn-sm"><i class="bi bi-trash"></i> Cancel</button>
                                     </form>
                                 </td>
                             </tr>
-                        `;
-                        pendingOrdersBody.innerHTML += row;
+                        `);
                     });
                 }
+                pendingOrdersBody.innerHTML = rows.join('');
             } catch (error) {
                 console.error('Error fetching pending orders:', error.message);
             }
@@ -206,9 +225,9 @@
                 const response = await fetch('/summary_stats');
                 const summaryData = await response.json();
 
-                document.querySelector('#portfolio-value').textContent = `$${summaryData.portfolio_value.toFixed(2)}`;
-                document.querySelector('#total-pnl').textContent = `$${summaryData.total_pnl.toFixed(2)}`;
-                document.querySelector('#margin-used').textContent = `$${summaryData.margin_used.toFixed(2)}`;
+                document.querySelector('#portfolio-value').textContent = `$${num(summaryData.portfolio_value, 2)}`;
+                document.querySelector('#total-pnl').textContent = `$${num(summaryData.total_pnl, 2)}`;
+                document.querySelector('#margin-used').textContent = `$${num(summaryData.margin_used, 2)}`;
             } catch (error) {
                 console.error('Error fetching summary stats:', error);
             }

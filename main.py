@@ -1,17 +1,20 @@
-import os
-import threading
+"""Local (non-Docker) entry point. The container uses supervisord instead."""
+
 import logging
+import os
 import signal
-import sys
 import subprocess
-from dotenv import load_dotenv
+import sys
+import threading
+
+import config
 from email_reader import run_email_reader
 
-# Load environment variables
-load_dotenv()
+logging.basicConfig(level=logging.INFO)
 
 # Store subprocesses (Gunicorn processes)
 processes = []
+
 
 def handle_exit_signal(signum, frame):
     """Graceful shutdown for all services."""
@@ -21,15 +24,24 @@ def handle_exit_signal(signum, frame):
         proc.terminate()
     sys.exit(0)
 
+
 # Attach signal handlers for Ctrl+C
 signal.signal(signal.SIGINT, handle_exit_signal)
 signal.signal(signal.SIGTERM, handle_exit_signal)
 
+
 def start_gunicorn(service_name, port):
     """Start Gunicorn for a given service (dashboard or webhook)."""
     logging.info(f"Starting {service_name} on port {port}...")
-    proc = subprocess.Popen(["gunicorn", "-w", "2", "-b", f"0.0.0.0:{port}", f"{service_name}:app"])
+    env = dict(os.environ, TRADEX_SERVICE=service_name)
+    # One worker: the login lockout counter is in-process, and a second worker
+    # would duplicate the ccxt clients and race on the log files.
+    proc = subprocess.Popen(
+        ["gunicorn", "-w", "1", "-b", f"0.0.0.0:{port}", f"{service_name}:app"],
+        env=env,
+    )
     processes.append(proc)
+
 
 def start_email_reader():
     """Start the email reader in a background thread."""
@@ -38,22 +50,17 @@ def start_email_reader():
     email_thread.start()
     return email_thread
 
+
 if __name__ == "__main__":
-    mode = os.getenv("MODE", "both").strip().lower()
+    # MODE is validated in config, so no second check is needed here.
+    if config.WEBHOOK_ENABLED:
+        start_gunicorn("webhook_receiver", config.WEBHOOK_PORT)
 
-    if mode not in ["webhook", "email", "both"]:
-        logging.error(f"Invalid MODE in .env: {mode}. Expected 'webhook', 'email', or 'both'.")
-        sys.exit(1)
-
-    # Start Gunicorn services
-    if mode in ["webhook", "both"]:
-        start_gunicorn("webhook_receiver", 5005)
-
-    if mode in ["email", "both"]:
-        email_thread = start_email_reader()
+    if config.EMAIL_ENABLED:
+        start_email_reader()
 
     # Always start the dashboard
-    start_gunicorn("dashboard_app", 5000)
+    start_gunicorn("dashboard_app", config.DASHBOARD_PORT)
 
     # Wait for Gunicorn processes to finish
     for proc in processes:

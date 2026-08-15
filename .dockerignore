@@ -1,9 +1,44 @@
 # dockerignore
-__pycache__
-*.pyc
-*.pyo
-logs/
-.git
+
+# Secrets are injected at runtime via env_file, never baked into the image.
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtualenvs — a local env copied into the image is huge and unused
 venv/
+.venv/
+env/
+
+# Runtime / editor leftovers
+logs/
+*.log
+.history/
+.idea/
+.vscode/
+.claude/
+*.swp
+.DS_Store
+
+# Git and Docker host files
+.git
+.gitignore
+.dockerignore
+Dockerfile
+docker-compose.yml
+docker-compose.yaml
+docker-compose.*.yml
+docker-compose.*.yaml
+
+# Docs, tests, and host-only scripts (not used inside the container)
+*.md
 *.MD
-*.yml
+tests/
+build_and_run.sh
+requirements-dev.txt
+generate_credentials.py

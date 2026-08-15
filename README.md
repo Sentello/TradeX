@@ -185,7 +185,7 @@ Set the `MODE` variable in your `.env` file to one of the following options:
    ```bash
    python generate_credentials.py
    ```
-   This will generate values like `FLASK_SECRET_KEY=...` and `DASHBOARD_PASSWORD=$2b$12$...` which can be copied into your `.env` file.
+   This will generate `FLASK_SECRET_KEY`, `WEBHOOK_PIN`, and a bcrypt `DASHBOARD_PASSWORD` hash to copy into your `.env` file. Paste the printed hash, not the password you typed.
 
 5. **Run the Application Locally**:
    ```bash

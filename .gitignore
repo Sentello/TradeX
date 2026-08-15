@@ -1,8 +1,28 @@
 # gitignore
-__pycache__/
-*.pyc
-*.pyo
+
+# Secrets. .env.example is the template and must stay tracked.
 .env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtualenvs
 venv/
+.venv/
+env/
+
+# Runtime
 logs/
+*.log
+
+# Editor leftovers
 .history/
+.idea/
+.claude/
+*.swp
+.DS_Store
+

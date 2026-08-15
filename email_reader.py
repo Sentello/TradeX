@@ -1,75 +1,113 @@
-import time
-import imaplib
-import ssl
-import email
-import json
-import logging
-import os
-import sys
-import html
-import re
-import quopri
-from logging.handlers import RotatingFileHandler
+import log_setup
 
-import config
-from signal_handler import process_signal
+# Configure logging before importing modules that create loggers.
+log_setup.configure("email_reader")
 
-# Setup logging
-if os.getenv("DOCKER_ENV"):
-    log_directory = "/app/logs"  # Inside Docker
-else:
-    log_directory = "logs"  # Local execution
-os.makedirs(log_directory, exist_ok=True)
+import email  # noqa: E402
+import hmac  # noqa: E402
+import html  # noqa: E402
+import imaplib  # noqa: E402
+import json  # noqa: E402
+import re  # noqa: E402
+import ssl  # noqa: E402
+import sys  # noqa: E402
+import time  # noqa: E402
+from email.header import decode_header, make_header  # noqa: E402
 
-log_file_path = os.path.join(log_directory, "email_reader.log")
-file_handler = RotatingFileHandler(log_file_path, maxBytes=2_000_000, backupCount=5)
-console_handler = logging.StreamHandler()
+import config  # noqa: E402
+from log_setup import redact  # noqa: E402
+from signal_handler import process_signal  # noqa: E402
 
-logger = logging.getLogger("email_reader")
-logger.setLevel(logging.INFO)
-formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s")
-file_handler.setFormatter(formatter)
-console_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
-logger.addHandler(console_handler)
-
+logger = log_setup.get_logger("email_reader")
 logger.info("🎉 Email Reader initialized!")
 
 
-def parse_email_subject(msg):
+def decode_subject(msg):
+    """Decode an RFC 2047 encoded subject header.
+
+    The previous latin-1 round-trip used the *body* charset and broke on
+    base64-encoded (=?utf-8?B?...) subjects.
+    """
+    raw = msg.get("Subject", "")
+    if not raw:
+        return ""
+    try:
+        return str(make_header(decode_header(raw))).strip()
+    except Exception as e:
+        logger.warning(f"[Email Reader] ⚠ Could not decode subject header: {e}")
+        return raw.strip()
+
+
+def parse_email_subject(subject):
     """Extracts and parses JSON data from the email subject."""
-    subject = msg.get("Subject", "").strip()
-    logger.info(f"[Email Reader] 📩 Checking email with subject: {subject}")
+    logger.info(f"[Email Reader] 📩 Checking email with subject: {subject[:80]}")
 
-    if subject.startswith("Alert:"):
-        try:
-            # Extract the JSON part after "Alert:"
-            json_part = subject.split("Alert:", 1)[1].strip()
+    if not subject.startswith("Alert:"):
+        return None
 
-            # Decode HTML entities (e.g., &nbsp;, &zwj;)
-            json_part = html.unescape(json_part)
+    try:
+        # Extract the JSON part after "Alert:"
+        json_part = subject.split("Alert:", 1)[1].strip()
 
-            # Remove invisible characters and whitespace artifacts
-            json_part = re.sub(r'[\u200B-\u200D\uFEFF]', '', json_part)  # Remove zero-width spaces
-            json_part = json_part.replace('\n', '').replace('\r', '')  # Remove newlines
+        # Decode HTML entities (e.g., &nbsp;, &zwj;)
+        json_part = html.unescape(json_part)
 
-            # Parse the cleaned JSON
-            return json.loads(json_part)
-        except json.JSONDecodeError as e:
-            logger.error(f"[Email Reader] ❌ Could not parse subject as JSON: {e}")
+        # Remove invisible characters and whitespace artifacts
+        json_part = re.sub(r'[\u200B-\u200D\uFEFF]', '', json_part)  # Remove zero-width spaces
+        json_part = json_part.replace('\n', '').replace('\r', '')  # Remove newlines
+
+        return json.loads(json_part)
+    except json.JSONDecodeError as e:
+        logger.error(f"[Email Reader] ❌ Could not parse subject as JSON: {e}")
     return None
+
+
+def _connect():
+    if config.IMAP_USE_SSL:
+        return imaplib.IMAP4_SSL(config.IMAP_SERVER, config.IMAP_PORT)
+    context = ssl.create_default_context()
+    mail = imaplib.IMAP4(config.IMAP_SERVER, config.IMAP_PORT)
+    mail.starttls(ssl_context=context)
+    return mail
+
+
+def _handle_message(mail, e_id):
+    status, msg_data = mail.fetch(e_id, "(BODY.PEEK[])")
+    if status != "OK":
+        return
+
+    msg = email.message_from_bytes(msg_data[0][1])
+    alert_data = parse_email_subject(decode_subject(msg))
+
+    if not alert_data:
+        logger.info("[Email Reader] 📌 Non-trade email detected, leaving it UNSEEN.")
+        return
+
+    if not isinstance(alert_data, dict):
+        logger.warning("[Email Reader] ❌ Alert payload is not a JSON object.")
+        return
+
+    if not hmac.compare_digest(str(alert_data.get("PIN", "")), config.WEBHOOK_PIN):
+        logger.warning("[Email Reader] ❌ Invalid PIN in email alert.")
+        return
+
+    # Flag before trading. If the process dies mid-order, an unflagged mail
+    # would be picked up again on restart and place the order a second time;
+    # a missed signal is preferable to a duplicated one.
+    mail.store(e_id, "+FLAGS", "\\Seen")
+
+    logger.info(f"[Email Reader] ✅ Processing alert: {redact(alert_data)}")
+    result = process_signal(alert_data)
+    if result["status"] != "success":
+        logger.error(f"[Email Reader] ❌ Signal rejected: {result['message']}")
 
 
 def check_inbox():
     """Connects to the IMAP server, reads unread emails, and processes only trade-related alerts."""
+    mail = None
     try:
         logger.info("[Email Reader] 🔄 Connecting to IMAP server...")
-        if config.IMAP_USE_SSL:
-            mail = imaplib.IMAP4_SSL(config.IMAP_SERVER, config.IMAP_PORT)
-        else:
-            context = ssl.create_default_context()
-            mail = imaplib.IMAP4(config.IMAP_SERVER, config.IMAP_PORT)
-            mail.starttls(ssl_context=context)
+        mail = _connect()
         mail.login(config.IMAP_EMAIL, config.IMAP_PASSWORD)
         mail.select("INBOX")
         logger.info("[Email Reader] ✅ IMAP connection successful.")
@@ -78,7 +116,6 @@ def check_inbox():
         status, data = mail.search(None, '(UNSEEN)')
         if status != "OK":
             logger.warning("[Email Reader] ⚠ No new emails or failed to search inbox.")
-            mail.logout()
             return
 
         email_ids = data[0].split()
@@ -86,49 +123,30 @@ def check_inbox():
 
         for e_id in email_ids:
             try:
-                # Fetch email in "peek" mode to avoid marking it as seen
-                status, msg_data = mail.fetch(e_id, "(BODY.PEEK[])")
-                if status == "OK":
-                    raw_email = msg_data[0][1]
-                    msg = email.message_from_bytes(raw_email)
-
-                    # Decode subject if necessary
-                    subject = msg.get("Subject", "")
-                    if msg.get_content_charset():
-                        subject = subject.encode('latin-1').decode(msg.get_content_charset())
-                    subject = quopri.decodestring(subject).decode('utf-8')  # Decode quoted-printable
-
-                    msg.replace_header("Subject", subject)  # Replace the subject with the decoded version
-
-                    alert_data = parse_email_subject(msg)
-                    if alert_data:
-                        logger.info(f"[Email Reader] ✅ Processing alert: {alert_data}")
-
-                        # Validate PIN (if required)
-                        if config.WEBHOOK_PIN:
-                            incoming_pin = alert_data.get("PIN", "")
-                            if incoming_pin != config.WEBHOOK_PIN:
-                                logger.warning(f"[Email Reader] ❌ Invalid PIN in email alert: {incoming_pin}")
-                                continue
-
-                        process_signal(alert_data)
-                        mail.store(e_id, "+FLAGS", "\\Seen")  # Mark only trade emails as read
-                    else:
-                        logger.info("[Email Reader] 📌 Non-trade email detected, leaving it UNSEEN.")
+                _handle_message(mail, e_id)
             except Exception as e:
                 logger.error(f"[Email Reader] ❌ Error processing email {e_id}: {e}")
 
-        mail.logout()
         logger.info("[Email Reader] ✅ Finished processing emails.")
     except imaplib.IMAP4.error as e:
         logger.error(f"[Email Reader] ❌ IMAP error: {e}")
     except Exception as e:
         logger.error(f"[Email Reader] ❌ Unexpected error: {e}")
-
+    finally:
+        if mail is not None:
+            try:
+                mail.logout()
+            except Exception:
+                pass
 
 
 def run_email_reader():
     """Runs the email reader in an infinite loop."""
+    if not config.EMAIL_ENABLED:
+        # Supervisor treats a clean exit as "do not restart".
+        logger.info(f"[Email Reader] ⏭ MODE={config.MODE}, email ingestion disabled.")
+        return
+
     logger.info("[Email Reader] 🚀 Starting email reader...")
     try:
         while True:
@@ -136,9 +154,8 @@ def run_email_reader():
             time.sleep(config.IMAP_CHECK_INTERVAL)
     except KeyboardInterrupt:
         logger.info("[Email Reader] 🛑 Stopping manually.")
-    except Exception as e:
-        logger.error(f"[Email Reader] ❌ Fatal error: {e}")
 
 
 if __name__ == "__main__":
     run_email_reader()
+    sys.exit(0)

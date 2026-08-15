@@ -1,55 +1,59 @@
-import os
-import logging
-from logging.handlers import RotatingFileHandler
-from flask import Flask, request, jsonify
-import json
-import config
-from signal_handler import process_signal
+import hmac
 
-# Setup logging
-if os.getenv("DOCKER_ENV"):
-    log_directory = "/app/logs"  # Inside Docker
-else:
-    log_directory = "logs"  # Local execution
-os.makedirs(log_directory, exist_ok=True)
-log_file_path = os.path.join(log_directory, "webhook.log")
-file_handler = RotatingFileHandler(log_file_path, maxBytes=2_000_000, backupCount=5)
-console_handler = logging.StreamHandler()
+import log_setup
 
-logger = logging.getLogger("webhook")
-logger.setLevel(logging.INFO)
-formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s")
-file_handler.setFormatter(formatter)
-console_handler.setFormatter(formatter)
-# add handlers to logger
-logger.addHandler(file_handler)
-logger.addHandler(console_handler)
+# Configure logging before importing modules that create loggers.
+log_setup.configure("webhook")
 
+from flask import Flask, jsonify, request  # noqa: E402
+
+import config  # noqa: E402
+from log_setup import redact  # noqa: E402
+from signal_handler import process_signal  # noqa: E402
+
+logger = log_setup.get_logger("webhook")
 logger.info("🎉 Webhook initialized!")
 
 app = Flask(__name__)
 
+
+def _pin_is_valid(incoming):
+    """Constant-time comparison so the PIN can't be recovered by timing."""
+    return hmac.compare_digest(str(incoming), config.WEBHOOK_PIN)
+
+
 @app.route("/webhook", methods=["POST"])
 def trade_signal():
     try:
-        data = request.json
-        if data is None:
-            logger.warning("Received empty JSON request")
-            return jsonify({"error": "No JSON data"}), 400
+        if not config.WEBHOOK_ENABLED:
+            logger.warning(f"Webhook hit while MODE={config.MODE}, refusing.")
+            return jsonify({"error": "Webhook ingestion is disabled"}), 503
 
-        # Validate PIN (if set)
-        incoming_pin = data.get("PIN", "")
-        if config.WEBHOOK_PIN and incoming_pin != config.WEBHOOK_PIN:
+        # force=True: senders such as TradingView post JSON as text/plain,
+        # which request.json rejects with a 415 before we ever see the body.
+        data = request.get_json(force=True, silent=True)
+        if not isinstance(data, dict):
+            logger.warning("Received a request with no valid JSON object body")
+            return jsonify({"error": "Malformed or missing JSON body"}), 400
+
+        if not _pin_is_valid(data.get("PIN", "")):
             logger.warning("Invalid webhook PIN received")
             return jsonify({"error": "Invalid pin"}), 403
 
-        logger.info(f"Received webhook data: {data}")
-        process_signal(data)
+        logger.info(f"Received webhook data: {redact(data)}")
+        result = process_signal(data)
 
-        return jsonify({"status": "ok"}), 200
-    except json.JSONDecodeError:
-        logger.error("Malformed JSON received in webhook")
-        return jsonify({"error": "Malformed JSON"}), 400
+        if result["status"] == "success":
+            return jsonify({"status": "ok", "order": result["order"]}), 200
+
+        # Report the failure instead of answering 200 for an order that
+        # never reached the exchange.
+        return jsonify({"error": result["message"]}), result.get("code", 400)
     except Exception as e:
-        logger.error(f"Webhook processing error: {e}")
-        return jsonify({"error": str(e)}), 500
+        logger.exception(f"Webhook processing error: {e}")
+        return jsonify({"error": "Internal error"}), 500
+
+
+@app.route("/health", methods=["GET"])
+def health():
+    return jsonify({"status": "ok", "mode": config.MODE}), 200

@@ -1,69 +1,12 @@
-import ccxt
-import logging
-import config
-import os
-from logging.handlers import RotatingFileHandler
+"""Read and act on exchange state for the dashboard."""
 
-# Setup logging
-if os.getenv("DOCKER_ENV"):
-    log_directory = "/app/logs"  # Inside Docker
-else:
-    log_directory = "logs"  # Local execution
-os.makedirs(log_directory, exist_ok=True)
-log_file_path = os.path.join(log_directory, "trading.log")
-file_handler = RotatingFileHandler(log_file_path, maxBytes=2_000_000, backupCount=5)
-console_handler = logging.StreamHandler()
+import exchanges as exchange_registry
+from log_setup import get_logger
 
-logger = logging.getLogger("trading")
-logger.setLevel(logging.INFO)
-formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s")
-file_handler.setFormatter(formatter)
-console_handler.setFormatter(formatter)
-# add handlers to logger
-logger.addHandler(file_handler)
-logger.addHandler(console_handler)
+logger = get_logger("bot_logic")
 
-logger.info("🔄 Initializing exchanges...")
+exchanges = exchange_registry.exchanges
 
-
-# Initialize exchanges dictionary
-exchanges = {}
-
-if config.BYBIT_API_KEY and config.BYBIT_API_SECRET:
-    logger.info("🔄 Setting up Bybit API...")
-    try:
-        exchanges['bybit'] = ccxt.bybit({
-            'apiKey': config.BYBIT_API_KEY,
-            'secret': config.BYBIT_API_SECRET
-        })
-        # Enable timestamp synchronization to prevent "invalid request" errors
-        exchanges['bybit'].options["recvWindow"] = 5000
-        exchanges['bybit'].options["adjustForTimeDifference"] = True
-        logger.info("✅ Bybit successfully initialized!")
-    except Exception as e:
-        logger.error(f"❌ Error initializing Bybit: {e}")
-
-if config.BINANCE_API_KEY and config.BINANCE_API_SECRET:
-    logger.info("🔄 Setting up Binance API...")
-    try:
-        exchanges['binance'] = ccxt.binance({
-            'apiKey': config.BINANCE_API_KEY,
-            'secret': config.BINANCE_API_SECRET,
-            'options': {
-                'defaultType': 'future'  # Use futures account by default
-            }
-        })
-        # Suppress the warning about fetching open orders without specifying a symbol
-        exchanges['binance'].options["warnOnFetchOpenOrdersWithoutSymbol"] = False
-        logger.info("✅ Binance successfully initialized!")
-    except Exception as e:
-        logger.error(f"❌ Error initializing Binance: {e}")
-
-# Log final exchange state
-if exchanges:
-    logger.info(f"🎉 Loaded exchanges: {list(exchanges.keys())}")
-else:
-    logger.error("❌ No exchanges loaded! Double-check API keys and config.")
 
 # ==============================
 # 🚀 Functions for Trading Logic
@@ -93,6 +36,7 @@ def get_positions():
                         "liquidation_price": pos.get('liquidationPrice', None),
                         "margin_ratio": pos.get('marginRatio', None),
                         "leverage": pos.get('leverage', None),
+                        "initial_margin": pos.get('initialMargin', None),
                         "unrealized_pnl": pos.get('unrealizedPnl', 0.0),
                         "exchange": exchange_name
                     })
@@ -129,11 +73,10 @@ def execute_order(exchange_name, symbol, side, order_type, quantity, price=None)
     """Places an order on the specified exchange."""
     logger.info(f"📌 Executing order on {exchange_name}: {side} {quantity} {symbol} ({order_type}) at {price if price else 'market price'}")
 
-    if exchange_name not in exchanges:
+    exchange = exchange_registry.get(exchange_name)
+    if exchange is None:
         logger.error(f"❌ Exchange {exchange_name} not available.")
         return {"status": "error", "message": f"Exchange {exchange_name} not found."}
-
-    exchange = exchanges[exchange_name]
 
     try:
         if order_type == "market":
@@ -152,24 +95,35 @@ def execute_order(exchange_name, symbol, side, order_type, quantity, price=None)
         return {"status": "error", "message": str(e)}
 
 
-def close_position(exchange_name, symbol):
-    """Closes an open position."""
+def _close_from_snapshot(exchange, exchange_name, pos):
+    """Send the reducing order for an already-fetched position."""
+    side = "sell" if (pos["side"] == "buy" or pos["side"] == "long") else "buy"
+    # reduceOnly matters: if the position closed between the fetch and this
+    # call (stop-loss, partial fill, a concurrent close), a plain market order
+    # would open a brand new position in the opposite direction.
+    order = exchange.create_order(
+        pos["symbol"], "market", side, pos["contracts"], None, {"reduceOnly": True}
+    )
+    logger.info(f"✅ Position closed on {exchange_name}: {order}")
+    return {"status": "success", "order": order}
+
+
+def close_position(exchange_name, symbol, positions=None):
+    """Closes an open position. Pass `positions` to reuse an existing snapshot."""
     logger.info(f"❌ Closing position for {symbol} on {exchange_name}...")
 
-    if exchange_name not in exchanges:
+    exchange = exchange_registry.get(exchange_name)
+    if exchange is None:
         logger.error(f"❌ Exchange {exchange_name} not available.")
         return {"status": "error", "message": f"Exchange {exchange_name} not found."}
 
-    exchange = exchanges[exchange_name]
-
     try:
-        positions = get_positions().get(exchange_name, [])
+        if positions is None:
+            positions = get_positions().get(exchange_name, [])
+
         for pos in positions:
             if pos["symbol"] == symbol:
-                side = "sell" if (pos["side"] == "buy" or pos["side"] == "long") else "buy"
-                order = exchange.create_market_order(symbol, side, pos["contracts"])
-                logger.info(f"✅ Position closed: {order}")
-                return {"status": "success", "order": order}
+                return _close_from_snapshot(exchange, exchange_name, pos)
 
         logger.warning(f"⚠ No open position found for {symbol}.")
         return {"status": "error", "message": "No open position found."}
@@ -184,11 +138,20 @@ def close_all_positions():
     logger.info("❌ Closing all open positions...")
 
     results = {}
-    for exchange_name, exchange in exchanges.items():
-        positions = get_positions().get(exchange_name, [])
+    # One snapshot for everything: this used to re-fetch every position for
+    # every position, which trips exchange rate limits.
+    all_positions = get_positions()
+
+    for exchange_name, positions in all_positions.items():
+        exchange = exchange_registry.get(exchange_name)
+        if exchange is None:
+            continue
         for pos in positions:
-            result = close_position(exchange_name, pos["symbol"])
-            results[pos["symbol"]] = result
+            try:
+                results[pos["symbol"]] = _close_from_snapshot(exchange, exchange_name, pos)
+            except Exception as e:
+                logger.error(f"❌ Error closing {pos['symbol']} on {exchange_name}: {e}")
+                results[pos["symbol"]] = {"status": "error", "message": str(e)}
 
     logger.info(f"✅ All positions closed: {results}")
     return results
@@ -198,11 +161,10 @@ def cancel_order(exchange_name, order_id, symbol):
     """Cancels a specific order."""
     logger.info(f"🚫 Cancelling order {order_id} on {exchange_name}...")
 
-    if exchange_name not in exchanges:
+    exchange = exchange_registry.get(exchange_name)
+    if exchange is None:
         logger.error(f"❌ Exchange {exchange_name} not available.")
         return {"status": "error", "message": f"Exchange {exchange_name} not found."}
-
-    exchange = exchanges[exchange_name]
 
     try:
         result = exchange.cancel_order(order_id, symbol)
@@ -211,6 +173,21 @@ def cancel_order(exchange_name, order_id, symbol):
     except Exception as e:
         logger.error(f"❌ Error cancelling order {order_id}: {e}")
         return {"status": "error", "message": str(e)}
+
+
+def _position_margin(pos):
+    """Margin committed to a position, preferring the exchange's own figure."""
+    initial_margin = pos.get("initial_margin")
+    if initial_margin:
+        return float(initial_margin)
+
+    # Fall back to notional / leverage. The old code multiplied notional by
+    # marginRatio, which is the *maintenance* margin ratio, not margin used.
+    notional = pos.get("notional") or 0.0
+    leverage = pos.get("leverage") or 0.0
+    if notional and leverage:
+        return float(notional) / float(leverage)
+    return 0.0
 
 
 def calculate_summary_stats():
@@ -226,15 +203,13 @@ def calculate_summary_stats():
         logger.error("❌ No exchanges loaded! Cannot calculate summary stats.")
         return summary_stats
 
+    # Fetched once, not once per exchange.
+    all_positions = get_positions()
+
     for exchange_name, exchange in exchanges.items():
         try:
-            # For futures accounts, fetch balance differently if needed
             account_balance = exchange.fetch_balance()
-
-            # Log the balance breakdown for debugging
             logger.info(f"🔍 [calculate_summary_stats] Balance breakdown for {exchange_name}: {account_balance.get('total', {})}")
-
-            positions = get_positions().get(exchange_name, [])
 
             # Calculate portfolio value - check for USDT, USDC, BUSD, or other stablecoins
             total_balance = 0.0
@@ -244,13 +219,12 @@ def calculate_summary_stats():
                     logger.info(f"💰 [calculate_summary_stats] Found {balance_info} {currency} in {exchange_name}")
             summary_stats["portfolio_value"] += total_balance
 
-            # Calculate total PNL and margin used from positions
-            for pos in positions:
-                summary_stats["total_pnl"] += pos.get('unrealized_pnl', 0.0)
-                summary_stats["margin_used"] += pos.get('notional', 0.0) * pos.get('margin_ratio', 0.0) if pos.get('margin_ratio') else 0.0
+            for pos in all_positions.get(exchange_name, []):
+                summary_stats["total_pnl"] += pos.get('unrealized_pnl') or 0.0
+                summary_stats["margin_used"] += _position_margin(pos)
 
         except Exception as e:
-            logger.error(f"❌ Error fetching account balance or positions for {exchange_name}: {e}")
+            logger.error(f"❌ Error fetching account balance for {exchange_name}: {e}")
 
     logger.info(f"📊 Summary statistics calculated: {summary_stats}")
     return summary_stats

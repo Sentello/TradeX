@@ -8,6 +8,8 @@ services:
     env_file:
       - .env
     ports:
+      # The dashboard has no TLS. Prefer "127.0.0.1:5000:5000" and reach it
+      # through a reverse proxy or an SSH tunnel rather than exposing it.
       - "5000:5000"  # Dashboard
       - "5005:5005"  # Webhook
     #volumes:

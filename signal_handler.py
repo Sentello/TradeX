@@ -1,95 +1,109 @@
-import os
-import logging
-from logging.handlers import RotatingFileHandler
-import config
-import ccxt
+"""Validation and execution of an incoming trade signal.
+
+Returns a result dict instead of swallowing failures, so the webhook can
+answer with a status that reflects whether the order actually reached the
+exchange.
+"""
+
+import exchanges as exchange_registry
+from log_setup import get_logger, redact
+
+logger = get_logger("signal_handler")
+
+REQUIRED_FIELDS = ("EXCHANGE", "SYMBOL", "SIDE", "ORDER_TYPE", "QUANTITY")
+VALID_SIDES = ("buy", "sell")
+VALID_ORDER_TYPES = ("market", "limit")
 
 
-# Setup logging
-if os.getenv("DOCKER_ENV"):
-    log_directory = "/app/logs"  # Inside Docker
-else:
-    log_directory = "logs"  # Local execution
-os.makedirs(log_directory, exist_ok=True)
-log_file_path = os.path.join(log_directory, "trading.log")
-file_handler = RotatingFileHandler(log_file_path, maxBytes=2_000_000, backupCount=5)
-console_handler = logging.StreamHandler()
-
-logger = logging.getLogger("trading")
-logger.setLevel(logging.INFO)
-formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s")
-file_handler.setFormatter(formatter)
-console_handler.setFormatter(formatter)
-# add handlers to logger
-logger.addHandler(file_handler)
-logger.addHandler(console_handler)
-
-logger.info("🎉 Trading Signal Handler initialized!")
+def _error(message, code=400):
+    logger.error(f"❌ {message}")
+    return {"status": "error", "message": message, "code": code}
 
 
-# Initialize exchanges
-exchanges = {
-    "bybit": ccxt.bybit({
-        "apiKey": config.BYBIT_API_KEY,
-        "secret": config.BYBIT_API_SECRET,
-        "enableRateLimit": True,
-    }),
-    "binance": ccxt.binance({
-        "apiKey": config.BINANCE_API_KEY,
-        "secret": config.BINANCE_API_SECRET,
-        "enableRateLimit": True,
-    })
-}
+def _positive_number(data, field):
+    """Parse a numeric field, rejecting zero, negatives and junk."""
+    try:
+        value = float(data[field])
+    except (TypeError, ValueError):
+        return None, f"Invalid {field}: must be a number"
+    if value <= 0:
+        return None, f"Invalid {field}: must be greater than zero"
+    return value, None
+
+
+def validate_signal(data):
+    """Return (parsed_order, error_result). Exactly one is None."""
+    if not isinstance(data, dict):
+        return None, _error("Signal payload must be a JSON object")
+
+    for field in REQUIRED_FIELDS:
+        if field not in data:
+            return None, _error(f"Missing required field: {field}")
+
+    exchange_name = str(data["EXCHANGE"]).strip().lower()
+    symbol = str(data["SYMBOL"]).strip()
+    side = str(data["SIDE"]).strip().lower()
+    order_type = str(data["ORDER_TYPE"]).strip().lower()
+
+    if not symbol:
+        return None, _error("Invalid SYMBOL: must not be empty")
+    if side not in VALID_SIDES:
+        return None, _error(f"Invalid SIDE: {side}. Must be 'buy' or 'sell'.")
+    if order_type not in VALID_ORDER_TYPES:
+        return None, _error(f"Unsupported ORDER_TYPE: {order_type}")
+
+    quantity, problem = _positive_number(data, "QUANTITY")
+    if problem:
+        return None, _error(problem)
+
+    price = None
+    if order_type == "limit":
+        if "PRICE" not in data:
+            return None, _error("Missing required field 'PRICE' for limit order.")
+        price, problem = _positive_number(data, "PRICE")
+        if problem:
+            return None, _error(problem)
+
+    exchange = exchange_registry.get(exchange_name)
+    if exchange is None:
+        # Unconfigured exchanges used to reach the API with blank credentials.
+        return None, _error(
+            f"Exchange '{exchange_name}' is not configured or has no API credentials.",
+            code=400,
+        )
+
+    order = {
+        "exchange_name": exchange_name,
+        "exchange": exchange,
+        "symbol": symbol,
+        "side": side,
+        "order_type": order_type,
+        "quantity": quantity,
+        "price": price,
+    }
+    return order, None
+
 
 def process_signal(data):
+    """Validate and place an order. Always returns a result dict."""
     try:
-        # Validate required fields
-        required_fields = ["EXCHANGE", "SYMBOL", "SIDE", "ORDER_TYPE", "QUANTITY"]
-        for field in required_fields:
-            if field not in data:
-                logger.error(f"❌ Missing required field: {field}")
-                return
+        order, problem = validate_signal(data)
+        if problem:
+            return problem
 
-        exchange_name = data["EXCHANGE"].lower()
-        symbol = data["SYMBOL"]
-        side = data["SIDE"].lower()
-        order_type = data["ORDER_TYPE"].lower()
-        try:
-            quantity = float(data["QUANTITY"])
-        except ValueError:
-            logger.error("❌ Invalid QUANTITY: must be a number")
-            return
-
-        # Validate side
-        if side not in ["buy", "sell"]:
-            logger.error(f"❌ Invalid SIDE: {side}. Must be 'buy' or 'sell'.")
-            return
-
-        # Validate required fields based on order type
-        if order_type == "limit":
-            if "PRICE" not in data:
-                logger.error("❌ Missing required field 'PRICE' for limit order.")
-                return
-            try:
-                price = float(data["PRICE"])
-            except ValueError:
-                logger.error("❌ Invalid PRICE: must be a number")
-                return
-
-        exchange = exchanges.get(exchange_name)
-        if not exchange:
-            logger.error(f"Exchange '{exchange_name}' is not configured.")
-            return
-
-        logger.info(f"Placing order on {exchange_name}: {data}")
-        if order_type == "limit":
-            order = exchange.create_order(symbol, order_type, side, quantity, price)
-        elif order_type == "market":
-            order = exchange.create_order(symbol, order_type, side, quantity)
-        else:
-            logger.error(f"❌ Unsupported order type: {order_type}")
-            return
-
-        logger.info(f"✅ Order placed successfully: {order}")
+        logger.info(
+            f"Placing order on {order['exchange_name']}: {redact(data)}"
+        )
+        placed = order["exchange"].create_order(
+            order["symbol"],
+            order["order_type"],
+            order["side"],
+            order["quantity"],
+            order["price"],
+        )
+        logger.info(f"✅ Order placed successfully: {placed}")
+        return {"status": "success", "order": placed, "code": 200}
     except Exception as e:
+        # The exchange rejected it (margin, symbol, permissions, connectivity).
         logger.error(f"❌ Error processing signal: {e}")
+        return {"status": "error", "message": str(e), "code": 502}

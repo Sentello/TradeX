@@ -1,58 +1,104 @@
-import logging
-from logging.handlers import RotatingFileHandler
-from flask import Flask, request, jsonify, render_template, redirect, url_for, session
-from datetime import timedelta
-import os
-import bcrypt
+import log_setup
 
-import config
-from bot_logic import (
-    calculate_summary_stats,
-    execute_order,
-    get_positions,
-    get_pending_orders,
-    close_position,
-    close_all_positions,
-    cancel_order
+# Configure logging before importing modules that create loggers.
+log_setup.configure("dashboard")
+
+import hmac  # noqa: E402
+import os  # noqa: E402
+import secrets  # noqa: E402
+import time  # noqa: E402
+from collections import deque  # noqa: E402
+from functools import wraps  # noqa: E402
+
+import bcrypt  # noqa: E402
+from flask import (  # noqa: E402
+    Flask,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
 )
 
-# Setup logging
-if os.getenv("DOCKER_ENV"):
-    log_directory = "/app/logs"  # Inside Docker
-else:
-    log_directory = "logs"  # Local execution
-os.makedirs(log_directory, exist_ok=True)
+import config  # noqa: E402
+from bot_logic import (  # noqa: E402
+    calculate_summary_stats,
+    cancel_order,
+    close_all_positions,
+    close_position,
+    get_pending_orders,
+    get_positions,
+)
 
-# Set up RotatingFileHandler
-log_file_path = os.path.join(log_directory, "dashboard.log")
-file_handler = RotatingFileHandler(log_file_path, maxBytes=2_000_000, backupCount=5)
-console_handler = logging.StreamHandler()
-
-logger = logging.getLogger("dashboard")
-logger.setLevel(logging.INFO)
-formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s")
-file_handler.setFormatter(formatter)
-console_handler.setFormatter(formatter)
-# add handlers to logger
-logger.addHandler(file_handler)
-logger.addHandler(console_handler)
+logger = log_setup.get_logger("dashboard")
+log_directory = log_setup.log_directory()
 
 logger.info("🎉 Dashboard initialized!")
 
+# Lines returned per log file. The whole file used to be read into memory
+# on every poll.
+LOG_TAIL_LINES = 500
 
 # Initialize Flask app
 app = Flask(__name__)
 app.secret_key = config.FLASK_SECRET_KEY
 app.config.update(
     PERMANENT_SESSION_LIFETIME=config.SESSION_PERMANENT_LIFETIME,
-    SESSION_COOKIE_SECURE=False,  # Set to True if using HTTPS
+    SESSION_COOKIE_SECURE=config.SESSION_COOKIE_SECURE,
     SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SAMESITE="Strict"
+    SESSION_COOKIE_SAMESITE="Strict",
 )
+
+# Failed logins per client address. Single gunicorn worker, so this is shared
+# across all requests in the process.
+_failed_logins = {}
+
+
+def _client_id():
+    return request.remote_addr or "unknown"
+
+
+def _is_locked_out(client):
+    attempts, locked_until = _failed_logins.get(client, (0, 0.0))
+    if locked_until and time.time() < locked_until:
+        return True
+    if locked_until and time.time() >= locked_until:
+        _failed_logins.pop(client, None)
+    return False
+
+
+def _record_failure(client):
+    attempts, _ = _failed_logins.get(client, (0, 0.0))
+    attempts += 1
+    locked_until = 0.0
+    if attempts >= config.LOGIN_MAX_ATTEMPTS:
+        locked_until = time.time() + config.LOGIN_LOCKOUT_SECONDS
+        logger.warning(f"🔒 Locking out {client} after {attempts} failed logins.")
+    _failed_logins[client] = (attempts, locked_until)
+
+
+def _password_matches(password):
+    """False rather than an exception for any malformed input."""
+    if not password:
+        return False
+    try:
+        return bcrypt.checkpw(
+            password.encode("utf-8"), config.DASHBOARD_PASSWORD.encode("utf-8")
+        )
+    except (ValueError, TypeError) as e:
+        logger.error(f"DASHBOARD_PASSWORD is not a usable bcrypt hash: {e}")
+        return False
+
+
+def _csrf_token():
+    if "csrf_token" not in session:
+        session["csrf_token"] = secrets.token_urlsafe(32)
+    return session["csrf_token"]
+
 
 # Authentication Decorator
 def login_required(func):
-    from functools import wraps
     @wraps(func)
     def wrapper(*args, **kwargs):
         session.permanent = True
@@ -61,23 +107,46 @@ def login_required(func):
         return func(*args, **kwargs)
     return wrapper
 
+
+def csrf_protect(func):
+    """Reject state-changing requests that don't carry the session token."""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        submitted = request.form.get("csrf_token", "")
+        expected = session.get("csrf_token", "")
+        if not expected or not hmac.compare_digest(submitted, expected):
+            logger.warning(f"Rejected request with bad CSRF token from {_client_id()}")
+            return jsonify({"status": "error", "message": "Invalid CSRF token"}), 400
+        return func(*args, **kwargs)
+    return wrapper
+
+
 # Login Route
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        password = request.form.get("password")
-        # Hash the password from config.py (This should be done securely)
-        hashed_password = config.DASHBOARD_PASSWORD.encode('utf-8') # Assuming the password in config is already hashed
-        if bcrypt.checkpw(password.encode('utf-8'), hashed_password):
+        client = _client_id()
+        if _is_locked_out(client):
+            logger.warning(f"Login attempt from locked-out client {client}.")
+            return render_template(
+                "login.html", error="Too many failed attempts. Try again later."
+            ), 429
+
+        if _password_matches(request.form.get("password")):
+            _failed_logins.pop(client, None)
+            # New session identifier on privilege change.
+            session.clear()
             session["logged_in"] = True
-            session["user_authenticated"] = True
             session.permanent = True
-            logger.info("User logged in successfully.")
+            _csrf_token()
+            logger.info(f"User logged in successfully from {client}.")
             return redirect(url_for("index"))
-        else:
-            logger.warning("Invalid login attempt.")
-            return render_template("login.html", error="Invalid password")
+
+        _record_failure(client)
+        logger.warning(f"Invalid login attempt from {client}.")
+        return render_template("login.html", error="Invalid password"), 401
     return render_template("login.html")
+
 
 # Logout Route
 @app.route("/logout")
@@ -85,6 +154,7 @@ def logout():
     session.clear()
     logger.info("User logged out.")
     return redirect(url_for("login"))
+
 
 # Dashboard Home
 @app.route("/")
@@ -94,10 +164,16 @@ def index():
     try:
         positions = get_positions()
         pending_orders = get_pending_orders()
-        return render_template("dashboard.html", positions=positions, pending_orders=pending_orders)
+        return render_template(
+            "dashboard.html",
+            positions=positions,
+            pending_orders=pending_orders,
+            csrf_token=_csrf_token(),
+        )
     except Exception as e:
         logger.error(f"Error loading dashboard: {e}")
-        return render_template("dashboard.html", error=str(e))
+        return render_template("dashboard.html", error=str(e), csrf_token=_csrf_token())
+
 
 # Fetch Positions (API)
 @app.route("/positions", methods=["GET"])
@@ -111,6 +187,7 @@ def positions():
         logger.error(f"Error fetching positions: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
+
 # Fetch Pending Orders (API)
 @app.route("/pending_orders", methods=["GET"])
 @login_required
@@ -123,60 +200,69 @@ def pending_orders():
         logger.error(f"Error fetching pending orders: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
+
 # Fetch Summary Stats (API)
 @app.route("/summary_stats", methods=["GET"])
 @login_required
 def summary_stats():
     try:
-        stats = calculate_summary_stats() # Placeholder function in bot_logic.py
+        stats = calculate_summary_stats()
         logger.info(f"Fetched summary stats: {stats}")
         return jsonify(stats)
     except Exception as e:
         logger.error(f"Error fetching summary stats: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
+
 # Close a Specific Position
 @app.route("/close_position", methods=["POST"])
 @login_required
+@csrf_protect
 def close_position_route():
     try:
-        data = request.form
-        exchange_name = data['EXCHANGE']
-        symbol = data['SYMBOL']
+        exchange_name = request.form["EXCHANGE"]
+        symbol = request.form["SYMBOL"]
         result = close_position(exchange_name, symbol)
         logger.info(f"Closed position for {symbol} on {exchange_name}: {result}")
-        return redirect(url_for("index"))
     except Exception as e:
         logger.error(f"Error closing position: {e}")
-        return redirect(url_for("index"))
+    return redirect(url_for("index"))
+
 
 # Close All Positions
 @app.route("/close_all_positions", methods=["POST"])
 @login_required
+@csrf_protect
 def close_all_positions_route():
     try:
-        result = close_all_positions()
+        close_all_positions()
         logger.info("Closed all positions.")
-        return redirect(url_for("index"))
     except Exception as e:
         logger.error(f"Error closing all positions: {e}")
-        return redirect(url_for("index"))
+    return redirect(url_for("index"))
+
 
 # Cancel Order
 @app.route("/cancel_order", methods=["POST"])
 @login_required
+@csrf_protect
 def cancel_order_route():
     try:
-        data = request.form
-        exchange_name = data["EXCHANGE"]
-        order_id = data["ORDER_ID"]
-        symbol = data["SYMBOL"]
-        result = cancel_order(exchange_name, order_id, symbol)
+        exchange_name = request.form["EXCHANGE"]
+        order_id = request.form["ORDER_ID"]
+        symbol = request.form["SYMBOL"]
+        cancel_order(exchange_name, order_id, symbol)
         logger.info(f"Canceled order {order_id} on {exchange_name}")
-        return redirect(url_for("index"))
     except Exception as e:
         logger.error(f"Error canceling order: {e}")
-        return redirect(url_for("index"))
+    return redirect(url_for("index"))
+
+
+def _tail(path, lines):
+    """Last `lines` lines of a file, without loading the whole thing."""
+    with open(path, "r", errors="replace") as f:
+        return list(deque(f, maxlen=lines))
+
 
 # Fetch Logs (API)
 @app.route("/logs", methods=["GET"])
@@ -185,11 +271,11 @@ def logs():
     try:
         log_files = [f for f in os.listdir(log_directory) if f.endswith(".log")]
         all_logs = {}
-        for log_file in log_files:
-            log_file_path = os.path.join(log_directory, log_file)
+        for log_file in sorted(log_files):
             try:
-                with open(log_file_path, "r") as f:
-                    all_logs[log_file] = f.readlines()
+                all_logs[log_file] = _tail(
+                    os.path.join(log_directory, log_file), LOG_TAIL_LINES
+                )
             except Exception as e:
                 all_logs[log_file] = [f"Error reading log file: {e}"]
         return jsonify({"status": "success", "logs": all_logs})
@@ -197,6 +283,7 @@ def logs():
         logger.error(f"Error fetching logs: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
-# Run Flask if executed directly (python main.py)
+
+# Run Flask if executed directly (python dashboard_app.py)
 if __name__ == "__main__":
     app.run(host=config.DASHBOARD_HOST, port=config.DASHBOARD_PORT)
