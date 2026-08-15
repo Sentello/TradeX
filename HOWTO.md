@@ -23,7 +23,7 @@ This guide provides step-by-step instructions for running TradeX as a background
    sudo apt install supervisor
    ```
 
-2. Ensure your project directory contains the provided `supervisord.conf` file. If not, copy it into your project directory.
+2. Have a working checkout and virtualenv. The host supervisor config is created in the next step — do not copy the repository's `supervisord.conf` (that file is for the container).
 
 ### **Steps**
 
@@ -48,6 +48,8 @@ sudo nano /etc/supervisor/conf.d/tradex.conf
 command=/path/to/tradex/.venv/bin/python /path/to/tradex/serve.py dashboard
 directory=/path/to/tradex
 user=your_user
+# serve.py execs gunicorn by name; without the venv on PATH that fails.
+environment=PATH="/path/to/tradex/.venv/bin:%(ENV_PATH)s"
 autostart=true
 autorestart=true
 startsecs=5
@@ -60,6 +62,7 @@ priority=10
 command=/path/to/tradex/.venv/bin/python /path/to/tradex/serve.py webhook
 directory=/path/to/tradex
 user=your_user
+environment=PATH="/path/to/tradex/.venv/bin:%(ENV_PATH)s"
 autostart=true
 autorestart=true
 startsecs=5
@@ -98,14 +101,14 @@ For Docker-based setups none of this applies — the container's
 `supervisord.conf` is already wired into the `Dockerfile`.
 
 #### 2. Reload Supervisor
-After copying the configuration file, reload `supervisor` to recognize the new configuration:
+After creating the configuration file, reload `supervisor` to recognize the new configuration:
 ```bash
 sudo supervisorctl reread
 sudo supervisorctl update
 ```
 
 #### 3. Start the Services
-Start all services defined in the `supervisord.conf` file:
+Start all services defined in `tradex.conf`:
 ```bash
 sudo supervisorctl start tradex:*
 ```
@@ -118,17 +121,17 @@ sudo supervisorctl status
 
 You should see output similar to:
 ```
-tradex:tradex_dashboard      RUNNING   pid 1234, uptime 0:05:23
-tradex:tradex_webhook        RUNNING   pid 1235, uptime 0:05:23
-tradex:email_reader       RUNNING   pid 1236, uptime 0:05:23
+tradex:tradex_dashboard         RUNNING   pid 1234, uptime 0:05:23
+tradex:tradex_webhook           RUNNING   pid 1235, uptime 0:05:23
+tradex:tradex_email_reader      RUNNING   pid 1236, uptime 0:05:23
 ```
 
 #### 5. View Logs
-To debug issues or monitor logs, check the log files specified in the `supervisord.conf` file:
+To debug issues or monitor logs, check the log files specified in `tradex.conf`:
 ```bash
-tail -f /var/log/supervisor/dashboard_app.err.log
-tail -f /var/log/supervisor/webhook_app.err.log
-tail -f /var/log/supervisor/email_reader.err.log
+tail -f /var/log/supervisor/tradex_dashboard.err.log
+tail -f /var/log/supervisor/tradex_webhook.err.log
+tail -f /var/log/supervisor/tradex_email_reader.err.log
 ```
 
 #### 6. Restart or Stop the Services
@@ -315,7 +318,7 @@ sudo systemctl stop webhook_app
 ### Common Issues
 - **Service Fails to Start**:
   - Check the logs for detailed error messages.
-  - Ensure all paths in the `.service` or `supervisord.conf` files are correct.
+  - Ensure all paths in the `.service` files or `/etc/supervisor/conf.d/tradex.conf` are correct.
   - Verify that the `.env` file exists and contains valid configuration.
 
 - **Port Conflicts**:

@@ -159,3 +159,15 @@ def test_host_supervisor_config_covers_every_service():
     assert "serve.py dashboard" in joined
     assert "serve.py webhook" in joined
     assert "email_reader.py" in joined
+
+
+def test_host_supervisor_puts_the_venv_on_path():
+    """serve.py execs gunicorn by name. The systemd units set PATH to the
+    venv; without the same on the supervisor programs, start fails with
+    No such file or directory: 'gunicorn'."""
+    for block in _ini_blocks("HOWTO.md", "[program:"):
+        joined = "\n".join(block)
+        if "serve.py" not in joined:
+            continue
+        assert ".venv/bin" in joined
+        assert "environment=PATH=" in joined
