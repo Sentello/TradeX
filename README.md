@@ -154,7 +154,7 @@ Set the `MODE` variable in your `.env` file to one of the following options:
 ## Installation
 
 ### Prerequisites
-- Python 3.8 or later
+- Python 3.10 or later (every dependency requires `>=3.10`; the Docker image uses 3.14)
 - `pip` package manager
 - API keys for supported exchanges (e.g., Bybit, Binance)
 - Docker (optional, for containerized deployment)
@@ -195,27 +195,107 @@ Set the `MODE` variable in your `.env` file to one of the following options:
 6. **Access the Dashboard**:
    - Open your browser and go to `http://localhost:5000`.
 
+### Running the Tests
+
+The test suite covers signal validation, webhook authentication, position
+closing and the dashboard login. `pytest` is not a runtime dependency, so
+install it separately:
+
+```bash
+pip install pytest
+pytest
+```
+
+To check the dependencies for known vulnerabilities:
+
+```bash
+pip install pip-audit
+pip-audit -r requirements.txt
+```
+
 ---
 
 ## Configuration
 
-The following environment variables must be configured in the `.env` file:
+### Two different credentials
 
-| Variable               | Description                                                                 |
-|------------------------|-----------------------------------------------------------------------------|
-| `DASHBOARD_PASSWORD`   | Password for accessing the dashboard.                                      |
-| `WEBHOOK_PIN`          | PIN for securing webhook trade signals.                                    |
-| `BYBIT_API_KEY`        | API key for Bybit.                                                         |
-| `BYBIT_API_SECRET`      | API secret for Bybit.                                                      |
-| `BINANCE_API_KEY`       | API key for Binance.                                                       |
-| `BINANCE_API_SECRET`    | API secret for Binance.                                                    |
-| `MODE`                 | Signal ingestion mode: `"webhook"`, `"email"`, or `"both"`.                |
-| `IMAP_SERVER`          | IMAP server address (e.g., `imap.gmail.com`).                              |
-| `IMAP_PORT`            | IMAP server port (usually `993` for SSL).                                  |
-| `IMAP_EMAIL`           | Email address for receiving trade signals.                                |
-| `IMAP_PASSWORD`        | Password for the email account.                                           |
+TradeX has **two separate secrets**, and mixing them up is the most common
+setup mistake:
 
+| Credential | Authenticates | Where you enter it |
+|---|---|---|
+| `WEBHOOK_PIN` | Incoming trade signals | Inside the JSON body of your TradingView alert (and email alerts) |
+| `DASHBOARD_PASSWORD` | You, in a browser | The dashboard login form |
 
+The webhook PIN will **not** log you into the dashboard. Use different
+values for the two: the PIN travels in plaintext inside alert bodies, so
+it should never also unlock the control panel.
+
+### Required
+
+The app refuses to start if any of these are missing, rather than falling
+back to an insecure default. Generate all three with
+`python generate_credentials.py`.
+
+| Variable | Description |
+|---|---|
+| `FLASK_SECRET_KEY` | Signs dashboard session cookies. A predictable value lets anyone forge a login. |
+| `DASHBOARD_PASSWORD` | **bcrypt hash** of the dashboard password, not the password itself. |
+| `WEBHOOK_PIN` | Authenticates trade signals. This is the only credential on `/webhook`, so make it long and random. |
+
+### Exchange API credentials
+
+| Variable | Default | Description |
+|---|---|---|
+| `BYBIT_API_KEY` | — | API key for Bybit. |
+| `BYBIT_API_SECRET` | — | API secret for Bybit. |
+| `BINANCE_API_KEY` | — | API key for Binance. |
+| `BINANCE_API_SECRET` | — | API secret for Binance. |
+| `EXCHANGES` | `bybit,binance` | Which exchanges to enable. An exchange is only loaded if it is listed here *and* has both a key and a secret. |
+
+### Signal ingestion
+
+| Variable | Default | Description |
+|---|---|---|
+| `MODE` | `webhook` | `webhook`, `email`, or `both`. In `webhook` mode the email reader exits cleanly; in `email` mode `/webhook` returns `503`. |
+
+### Email (IMAP) — required when `MODE` includes email
+
+| Variable | Default | Description |
+|---|---|---|
+| `IMAP_SERVER` | — | IMAP server address (e.g. `imap.gmail.com`). |
+| `IMAP_PORT` | `993` | IMAP server port. |
+| `IMAP_EMAIL` | — | Mailbox receiving trade signals. |
+| `IMAP_PASSWORD` | — | Password for that mailbox. |
+| `IMAP_USE_SSL` | `true` | Use implicit SSL. When `false`, STARTTLS is used instead. |
+| `IMAP_CHECK_INTERVAL` | `15` | Seconds between inbox checks. |
+
+### Webhook security
+
+| Variable | Default | Description |
+|---|---|---|
+| `WEBHOOK_ALLOWED_IPS` | *(empty — any address)* | Comma-separated IPs or CIDR blocks allowed to reach `/webhook`. **The most effective protection available**: restricting to TradingView's published IPs removes brute force as a concern entirely. |
+| `WEBHOOK_MAX_FAILURES` | `5` | Bad PINs from one address before it is locked out. |
+| `WEBHOOK_LOCKOUT_SECONDS` | `300` | How long that lockout lasts. Applied per source IP, never endpoint-wide, so an attacker cannot stop your real alerts by sending junk. |
+| `TRUST_PROXY_HEADERS` | `false` | Read the client address from `X-Forwarded-For`. **Only enable behind a reverse proxy that overwrites the header** — if the app is directly exposed, a client can forge it and bypass both the allowlist and the lockout. |
+
+### Dashboard and session
+
+| Variable | Default | Description |
+|---|---|---|
+| `SESSION_COOKIE_SECURE` | `false` | Set to `true` when serving the dashboard over HTTPS, so the session cookie is never sent in cleartext. |
+| `SESSION_LIFETIME_HOURS` | `12` | How long a dashboard login stays valid. |
+| `LOGIN_MAX_ATTEMPTS` | `5` | Failed logins from one address before lockout. |
+| `LOGIN_LOCKOUT_SECONDS` | `300` | How long that lockout lasts. |
+
+### Network
+
+| Variable | Default | Description |
+|---|---|---|
+| `DASHBOARD_HOST` | `0.0.0.0` | Dashboard bind address. |
+| `DASHBOARD_PORT` | `5000` | Dashboard port. |
+| `WEBHOOK_HOST` | `0.0.0.0` | Webhook bind address. |
+| `WEBHOOK_PORT` | `5005` | Webhook port. |
 
 ---
 
@@ -372,19 +452,31 @@ When sending webhooks (from TradingView), use the URL pointing to your domain or
 
 ## Troubleshooting
 
-- **Error: "No exchanges loaded!"**: Ensure your API keys are correctly configured in `.env`.
-- **Webhook Errors**: Verify the `WEBHOOK_PIN` matches the one in your `.env` file.
-- **Email Reader Issues**: Check IMAP credentials and ensure the email account allows IMAP access.
-- **Dashboard Not Accessible**: Ensure the Flask app is running and the correct port (`5000`) is exposed.
+- **The app refuses to start**: the error names the missing variable. `FLASK_SECRET_KEY`, `WEBHOOK_PIN` and `DASHBOARD_PASSWORD` are required, and `DASHBOARD_PASSWORD` must be a bcrypt hash — run `python generate_credentials.py`.
+- **Cannot log into the dashboard**: check you are not entering the `WEBHOOK_PIN`. It is a separate credential and will never work on the login form — see [Two different credentials](#two-different-credentials). If you have lost the password, generate a new hash and replace `DASHBOARD_PASSWORD` in `.env`.
+- **Login returns "Too many failed attempts"**: you have hit `LOGIN_MAX_ATTEMPTS` from this address. Wait `LOGIN_LOCKOUT_SECONDS` (5 minutes by default), or restart the dashboard to clear the counter, which is held in memory.
+- **Error: "No exchanges loaded!"**: ensure your API keys are set in `.env` and that the exchange is listed in `EXCHANGES`.
+- **Webhook returns 403**: the `PIN` in the alert body does not match `WEBHOOK_PIN`, or the sender's address is not in `WEBHOOK_ALLOWED_IPS`.
+- **Webhook returns 429**: that source IP is locked out after repeated bad PINs. See `WEBHOOK_LOCKOUT_SECONDS`.
+- **Webhook returns 503**: `MODE` does not include `webhook`.
+- **Email Reader Issues**: check IMAP credentials and ensure the email account allows IMAP access.
+- **Dashboard Not Accessible**: ensure the Flask app is running and the correct port (`5000`) is exposed.
 
-For further assistance, check the logs in the `logs/` directory.
+For further assistance, check the logs in the `logs/` directory. Each service writes its own file (`webhook.log`, `dashboard.log`, `email_reader.log`), also viewable from the dashboard.
 
 ---
 
 ## Security Best Practices
 
-- **Restrict Access**: Limit access to the dashboard by binding it to `127.0.0.1` or using a firewall.
-- **Regularly Rotate API Keys**: Periodically update your exchange API keys to minimize risks.
+- **Restrict who can reach the webhook**: set `WEBHOOK_ALLOWED_IPS` to TradingView's published source IPs. This is the single most effective control, because it removes brute-forcing the PIN as a possibility rather than merely slowing it down.
+- **Use a long, random `WEBHOOK_PIN`**: it is the only credential on an endpoint that places real orders. A 6-digit numeric PIN is a keyspace of 1,000,000 — crackable in about an hour at 100 requests/second. `python generate_credentials.py` produces a 43-character one.
+- **Never reuse the PIN as the dashboard password**: the PIN travels in plaintext inside alert bodies and across mail servers.
+- **Restrict access to the dashboard**: bind it to `127.0.0.1` or use a firewall. It has no TLS of its own, so the password and session cookie cross the network in cleartext unless you put it behind a reverse proxy.
+- **Serve the dashboard over HTTPS** and set `SESSION_COOKIE_SECURE=true` once you do.
+- **Regularly rotate API keys**: periodically update your exchange API keys to minimize risks.
+- **Restrict exchange API key permissions**: enable trading, but disable withdrawals and restrict the key to your server's IP where the exchange supports it.
+- **Never commit `.env`**: it is gitignored and excluded from the Docker image. Secrets are supplied at runtime via `env_file`.
+- **Audit dependencies periodically**: `pip-audit -r requirements.txt`.
 
 ---
 
