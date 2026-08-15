@@ -100,6 +100,11 @@ WEBHOOK_ALLOWED_IPS = _optional("WEBHOOK_ALLOWED_IPS", "")
 WEBHOOK_MAX_FAILURES = _int("WEBHOOK_MAX_FAILURES", 5)
 WEBHOOK_LOCKOUT_SECONDS = _int("WEBHOOK_LOCKOUT_SECONDS", 300)
 
+# Window in which an identical signal is treated as a retry and ignored,
+# so a lost response cannot turn into a doubled position. Set to 0 to
+# disable. Send a unique ID field in the alert to make this exact.
+WEBHOOK_DEDUP_SECONDS = _int("WEBHOOK_DEDUP_SECONDS", 60)
+
 # Only enable behind a reverse proxy that overwrites X-Forwarded-For.
 # Trusting it when directly exposed lets a client forge its own address and
 # walk straight past the allowlist and the lockout.

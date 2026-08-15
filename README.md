@@ -277,7 +277,40 @@ back to an insecure default. Generate all three with
 | `WEBHOOK_ALLOWED_IPS` | *(empty — any address)* | Comma-separated IPs or CIDR blocks allowed to reach `/webhook`. **The most effective protection available**: restricting to TradingView's published IPs removes brute force as a concern entirely. |
 | `WEBHOOK_MAX_FAILURES` | `5` | Bad PINs from one address before it is locked out. |
 | `WEBHOOK_LOCKOUT_SECONDS` | `300` | How long that lockout lasts. Applied per source IP, never endpoint-wide, so an attacker cannot stop your real alerts by sending junk. |
+| `WEBHOOK_DEDUP_SECONDS` | `60` | Ignore an identical signal repeated within this window, so a lost response cannot become a doubled position. See [Duplicate signals](#duplicate-signals). Set to `0` to disable. |
 | `TRUST_PROXY_HEADERS` | `false` | Read the client address from `X-Forwarded-For`. **Only enable behind a reverse proxy that overwrites the header** — if the app is directly exposed, a client can forge it and bypass both the allowlist and the lockout. |
+
+### Duplicate signals
+
+If the connection drops after the exchange accepted your order but before
+the reply gets back, the sender cannot tell that apart from a genuine
+failure — and resending would double your position. TradeX therefore
+ignores an identical signal repeated within `WEBHOOK_DEDUP_SECONDS`
+(60 by default), answering `200` with:
+
+```json
+{"status": "duplicate", "message": "Identical signal already accepted; no order placed."}
+```
+
+Two signals count as identical when every field except `PIN` matches. **If
+your strategy can legitimately fire the same order twice in quick
+succession, add a unique `ID` field to the alert** — when `ID` is present it
+alone decides identity, so genuine repeats always execute:
+
+```json
+{"PIN": "your_pin", "ID": "{{timenow}}", "EXCHANGE": "bybit", "SYMBOL": "BTC/USDT:USDT",
+ "SIDE": "buy", "ORDER_TYPE": "market", "QUANTITY": "0.01"}
+```
+
+A locally rejected signal (`400`) is not remembered, since nothing reached
+the exchange and a corrected retry must go through. A signal the exchange
+rejected (`502`) *is* remembered, because there is no way to prove the order
+did not land.
+
+This is at-most-once delivery within a window, not protection against a
+determined attacker — a captured request can still be replayed after the
+window expires. `WEBHOOK_PIN` and `WEBHOOK_ALLOWED_IPS` are the controls
+for that.
 
 ### Dashboard and session
 
@@ -459,6 +492,7 @@ When sending webhooks (from TradingView), use the URL pointing to your domain or
 - **Webhook returns 403**: the `PIN` in the alert body does not match `WEBHOOK_PIN`, or the sender's address is not in `WEBHOOK_ALLOWED_IPS`.
 - **Webhook returns 429**: that source IP is locked out after repeated bad PINs. See `WEBHOOK_LOCKOUT_SECONDS`.
 - **Webhook returns 503**: `MODE` does not include `webhook`.
+- **Webhook answers `"status": "duplicate"` and no order is placed**: an identical signal arrived within `WEBHOOK_DEDUP_SECONDS`. If that repeat was intentional, add a unique `ID` field to the alert — see [Duplicate signals](#duplicate-signals).
 - **Email Reader Issues**: check IMAP credentials and ensure the email account allows IMAP access.
 - **Dashboard Not Accessible**: ensure the Flask app is running and the correct port (`5000`) is exposed.
 

@@ -8,6 +8,7 @@ log_setup.configure("webhook")
 from flask import Flask, jsonify, request  # noqa: E402
 
 import config  # noqa: E402
+from dedup import DuplicateFilter, signal_key  # noqa: E402
 from log_setup import redact  # noqa: E402
 from ratelimit import FailureThrottle, ip_allowed, parse_networks  # noqa: E402
 from signal_handler import process_signal  # noqa: E402
@@ -27,6 +28,16 @@ else:
     )
 
 _throttle = FailureThrottle(config.WEBHOOK_MAX_FAILURES, config.WEBHOOK_LOCKOUT_SECONDS)
+_duplicates = DuplicateFilter(config.WEBHOOK_DEDUP_SECONDS)
+
+if config.WEBHOOK_DEDUP_SECONDS > 0:
+    logger.info(
+        f"🔁 Ignoring repeat signals within {config.WEBHOOK_DEDUP_SECONDS}s. "
+        "Send a unique ID field in the alert to distinguish a retry from a "
+        "genuine second identical order."
+    )
+else:
+    logger.warning("⚠ Duplicate signal suppression is disabled.")
 
 
 def _client_ip():
@@ -87,10 +98,27 @@ def trade_signal():
         _throttle.reset(client)
 
         logger.info(f"Received webhook data: {redact(data)}")
+
+        key = signal_key(data)
+        if _duplicates.check(key):
+            # 200, not an error: this is the answer to "did my signal land?",
+            # and a failure status would invite yet another retry.
+            logger.warning(f"Ignoring duplicate signal from {client} ({key})")
+            return jsonify({
+                "status": "duplicate",
+                "message": "Identical signal already accepted; no order placed.",
+            }), 200
+
         result = process_signal(data)
 
         if result["status"] == "success":
             return jsonify({"status": "ok", "order": result["order"]}), 200
+
+        # Validation failed locally, so nothing reached the exchange and a
+        # corrected retry must not be suppressed. An exchange-side failure
+        # (502) keeps the key, because we cannot prove the order did not land.
+        if result.get("code") == 400:
+            _duplicates.forget(key)
 
         # Report the failure instead of answering 200 for an order that
         # never reached the exchange.

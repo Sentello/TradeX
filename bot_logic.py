@@ -69,32 +69,6 @@ def get_pending_orders():
     return pending_orders
 
 
-def execute_order(exchange_name, symbol, side, order_type, quantity, price=None):
-    """Places an order on the specified exchange."""
-    logger.info(f"📌 Executing order on {exchange_name}: {side} {quantity} {symbol} ({order_type}) at {price if price else 'market price'}")
-
-    exchange = exchange_registry.get(exchange_name)
-    if exchange is None:
-        logger.error(f"❌ Exchange {exchange_name} not available.")
-        return {"status": "error", "message": f"Exchange {exchange_name} not found."}
-
-    try:
-        if order_type == "market":
-            order = exchange.create_market_order(symbol, side, quantity)
-        elif order_type == "limit" and price:
-            order = exchange.create_limit_order(symbol, side, quantity, price)
-        else:
-            logger.error(f"❌ Invalid order type: {order_type}")
-            return {"status": "error", "message": "Invalid order type"}
-
-        logger.info(f"✅ Order placed successfully: {order}")
-        return {"status": "success", "order": order}
-
-    except Exception as e:
-        logger.error(f"❌ Error executing order on {exchange_name}: {e}")
-        return {"status": "error", "message": str(e)}
-
-
 def _close_from_snapshot(exchange, exchange_name, pos):
     """Send the reducing order for an already-fetched position."""
     side = "sell" if (pos["side"] == "buy" or pos["side"] == "long") else "buy"

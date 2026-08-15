@@ -15,11 +15,16 @@ import time  # noqa: E402
 from email.header import decode_header, make_header  # noqa: E402
 
 import config  # noqa: E402
+from dedup import DuplicateFilter, signal_key  # noqa: E402
 from log_setup import redact  # noqa: E402
 from signal_handler import process_signal  # noqa: E402
 
 logger = log_setup.get_logger("email_reader")
 logger.info("🎉 Email Reader initialized!")
+
+# The \Seen flag stops the same message being reprocessed; this catches a
+# genuinely duplicated delivery, which arrives as a different message.
+_duplicates = DuplicateFilter(config.WEBHOOK_DEDUP_SECONDS)
 
 
 def decode_subject(msg):
@@ -96,10 +101,18 @@ def _handle_message(mail, e_id):
     # a missed signal is preferable to a duplicated one.
     mail.store(e_id, "+FLAGS", "\\Seen")
 
+    key = signal_key(alert_data)
+    if _duplicates.check(key):
+        logger.warning(f"[Email Reader] 🔁 Ignoring duplicate signal ({key})")
+        return
+
     logger.info(f"[Email Reader] ✅ Processing alert: {redact(alert_data)}")
     result = process_signal(alert_data)
     if result["status"] != "success":
         logger.error(f"[Email Reader] ❌ Signal rejected: {result['message']}")
+        if result.get("code") == 400:
+            # Nothing reached the exchange, so do not suppress a corrected retry.
+            _duplicates.forget(key)
 
 
 def check_inbox():
